@@ -17,15 +17,19 @@ const routes = [
     path: '/login',
     name: 'login',
     component: LoginView,
-    meta: { public: true }
+    meta: { public: true } // No auth required
   },
   {
     path: '/',
+    // Don't set component here, redirect to dashboard
+    redirect: '/dashboard'
+  },
+  {
+    path: '/dashboard',
     component: DashboardLayout,
     meta: { requiresAuth: true },
     children: [
-      { path: '', redirect: '/dashboard' },
-      { path: 'dashboard', name: 'dashboard', component: DashboardView },
+      { path: '', name: 'dashboard', component: DashboardView },
       { path: 'projects', name: 'projects', component: ProjectsView },
       { path: 'projects/:id', name: 'project-detail', component: ProjectDetailView },
       { path: 'messages', name: 'messages', component: MessagesView },
@@ -34,7 +38,14 @@ const routes = [
       { path: 'settings', name: 'settings', component: SettingsView },
     ]
   },
-  { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
+  // Catch all route - redirect to dashboard or login based on auth
+  { 
+    path: '/:pathMatch(.*)*', 
+    redirect: (to) => {
+      // You can add logic here if needed
+      return '/dashboard'
+    }
+  }
 ]
 
 const router = createRouter({
@@ -46,13 +57,34 @@ const router = createRouter({
   }
 })
 
-router.beforeEach((to, from, next) => {
+// Global navigation guard
+router.beforeEach(async (to, from, next) => {
+  // Initialize auth store
   const auth = useAuthStore()
-  if (!to.meta.public && !auth.isAuthenticated) {
-    next({ name: 'login', query: { redirect: to.fullPath } })
-  } else if (to.name === 'login' && auth.isAuthenticated) {
+  
+  // Optional: Wait for auth to be initialized if needed
+  // If your store has an init method, call it here
+  // await auth.init() // If you have an init method
+  
+  // Check if route requires authentication
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const isPublic = to.matched.some(record => record.meta.public)
+  
+  // If route requires auth and user is not authenticated
+  if (requiresAuth && !auth.isAuthenticated) {
+    // Redirect to login with return URL
+    next({ 
+      name: 'login', 
+      query: { redirect: to.fullPath } 
+    })
+  } 
+  // If user is authenticated and trying to access login page
+  else if (to.name === 'login' && auth.isAuthenticated) {
+    // Redirect to dashboard
     next({ name: 'dashboard' })
-  } else {
+  } 
+  // For all other cases, proceed
+  else {
     next()
   }
 })
