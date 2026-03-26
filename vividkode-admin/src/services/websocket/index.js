@@ -2,7 +2,6 @@ import { WebSocketClient } from './client';
 
 let instance = null;
 
-// Create the websocket object with methods
 export const websocket = {
   init(url) {
     if (!instance) {

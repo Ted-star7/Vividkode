@@ -17,11 +17,10 @@ const routes = [
     path: '/login',
     name: 'login',
     component: LoginView,
-    meta: { public: true } // No auth required
+    meta: { public: true } 
   },
   {
     path: '/',
-    // Don't set component here, redirect to dashboard
     redirect: '/dashboard'
   },
   {
@@ -38,11 +37,9 @@ const routes = [
       { path: 'settings', name: 'settings', component: SettingsView },
     ]
   },
-  // Catch all route - redirect to dashboard or login based on auth
   { 
     path: '/:pathMatch(.*)*', 
     redirect: (to) => {
-      // You can add logic here if needed
       return '/dashboard'
     }
   }
@@ -59,12 +56,7 @@ const router = createRouter({
 
 // Global navigation guard
 router.beforeEach(async (to, from, next) => {
-  // Initialize auth store
   const auth = useAuthStore()
-  
-  // Optional: Wait for auth to be initialized if needed
-  // If your store has an init method, call it here
-  // await auth.init() // If you have an init method
   
   // Check if route requires authentication
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
@@ -72,7 +64,6 @@ router.beforeEach(async (to, from, next) => {
   
   // If route requires auth and user is not authenticated
   if (requiresAuth && !auth.isAuthenticated) {
-    // Redirect to login with return URL
     next({ 
       name: 'login', 
       query: { redirect: to.fullPath } 
@@ -83,7 +74,6 @@ router.beforeEach(async (to, from, next) => {
     // Redirect to dashboard
     next({ name: 'dashboard' })
   } 
-  // For all other cases, proceed
   else {
     next()
   }

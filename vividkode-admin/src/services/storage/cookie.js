@@ -9,7 +9,7 @@ export const cookieStorage = {
    */
   set(key, value, options = {}) {
     const defaultOptions = {
-      expires: 7, 
+      expires: 7, // Default to 7 days
       path: '/',
       secure: true, // Only send over HTTPS
       sameSite: 'Strict', // CSRF protection
@@ -32,7 +32,6 @@ export const cookieStorage = {
     const value = Cookies.get(key);
     if (!value) return null;
     
-    // Try to parse JSON, return as is if not JSON
     try {
       return JSON.parse(value);
     } catch {
