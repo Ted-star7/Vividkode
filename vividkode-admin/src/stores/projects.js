@@ -1,79 +1,198 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { defineStore } from "pinia";
+import { ref, computed } from "vue";
+import { projectsApi } from "@/services";
 
-const INITIAL_PROJECTS = [
-  {
-    id: 1, title: 'TechNova E-Commerce Platform', description: 'Full-stack e-commerce solution with real-time inventory management and advanced analytics dashboard for a mid-sized retail company.',
-    techStack: ['Vue 3', 'Node.js', 'PostgreSQL', 'Redis'], status: 'completed', published: true,
-    client: 'TechNova Ltd', link: 'https://technova.com', image: '', createdAt: '2024-01-15', updatedAt: '2024-03-20',
-    category: 'Web Development'
-  },
-  {
-    id: 2, title: 'DataFlow Analytics Suite', description: 'Enterprise data visualization platform with custom reporting, ETL pipelines, and interactive dashboards for business intelligence.',
-    techStack: ['React', 'Python', 'Apache Spark', 'Tableau'], status: 'ongoing', published: true,
-    client: 'DataFlow Inc', link: '', image: '', createdAt: '2024-02-10', updatedAt: '2024-04-01',
-    category: 'Data Solutions'
-  },
-  {
-    id: 3, title: 'HealthTrack Patient Portal', description: 'HIPAA-compliant patient management system with appointment scheduling, telemedicine integration, and secure messaging.',
-    techStack: ['Next.js', 'Django', 'PostgreSQL', 'WebRTC'], status: 'ongoing', published: false,
-    client: 'HealthFirst Clinic', link: '', image: '', createdAt: '2024-03-01', updatedAt: '2024-04-10',
-    category: 'Web Development'
-  },
-  {
-    id: 4, title: 'LogiChain Supply Management', description: 'Real-time supply chain visibility platform with predictive analytics, vendor management, and automated reporting.',
-    techStack: ['Vue 3', 'FastAPI', 'MongoDB', 'Kafka'], status: 'completed', published: true,
-    client: 'LogiChain Corp', link: 'https://logichain.io', image: '', createdAt: '2023-11-05', updatedAt: '2024-01-30',
-    category: 'Data Solutions'
-  },
-  {
-    id: 5, title: 'CreativeHub Portfolio CMS', description: 'Custom content management system for creative agencies with drag-and-drop builder and multi-site management.',
-    techStack: ['Nuxt 3', 'Strapi', 'MySQL', 'Cloudinary'], status: 'completed', published: true,
-    client: 'Creative Studio X', link: 'https://creativehubx.com', image: '', createdAt: '2023-09-12', updatedAt: '2023-12-15',
-    category: 'Web Management'
-  },
-]
+export const useProjectsStore = defineStore("projects", () => {
+  // State
+  const projects = ref([]);
+  const loading = ref(false);
+  const error = ref(null);
 
-export const useProjectsStore = defineStore('projects', () => {
-  const projects = ref([...INITIAL_PROJECTS])
-  const loading = ref(false)
+  // Getters
+  const totalProjects = computed(() => projects.value.length);
+  const publishedProjects = computed(() =>
+    projects.value.filter((p) => p.published)
+  );
+  const ongoingProjects = computed(() =>
+    projects.value.filter((p) => p.status === "ongoing")
+  );
+  const completedProjects = computed(() =>
+    projects.value.filter((p) => p.status === "completed")
+  );
 
-  const totalProjects = computed(() => projects.value.length)
-  const publishedProjects = computed(() => projects.value.filter(p => p.published))
-  const ongoingProjects = computed(() => projects.value.filter(p => p.status === 'ongoing'))
-
+  // Helper: Get project by ID
   function getById(id) {
-    return projects.value.find(p => p.id === Number(id))
+    return projects.value.find((p) => p.id === Number(id) || p.id === id);
   }
 
-  async function createProject(data) {
-    loading.value = true
-    await new Promise(r => setTimeout(r, 500))
-    const newProject = { ...data, id: Date.now(), createdAt: new Date().toISOString().split('T')[0], updatedAt: new Date().toISOString().split('T')[0] }
-    projects.value.unshift(newProject)
-    loading.value = false
-    return newProject
-  }
+  // Fetch all projects
+  async function fetchProjects() {
+    loading.value = true;
+    error.value = null;
 
-  async function updateProject(id, data) {
-    loading.value = true
-    await new Promise(r => setTimeout(r, 400))
-    const idx = projects.value.findIndex(p => p.id === Number(id))
-    if (idx !== -1) {
-      projects.value[idx] = { ...projects.value[idx], ...data, updatedAt: new Date().toISOString().split('T')[0] }
+    try {
+      const response = await projectsApi.getAll();
+
+      if (response.success) {
+        projects.value = response.data || response.projects || [];
+      } else if (Array.isArray(response)) {
+        projects.value = response;
+      } else if (response.data && Array.isArray(response.data)) {
+        projects.value = response.data;
+      } else {
+        projects.value = [];
+      }
+
+      return { success: true, data: projects.value };
+    } catch (err) {
+      error.value = err.message || "Failed to fetch projects";
+      console.error("Fetch projects error:", err);
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
     }
-    loading.value = false
   }
 
+  // Fetch single project
+  async function fetchProjectById(id) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await projectsApi.getById(id);
+
+      let projectData;
+      if (response.success) {
+        projectData = response.data || response.project;
+      } else {
+        projectData = response;
+      }
+
+      const index = projects.value.findIndex((p) => p.id === id);
+      if (index !== -1) {
+        projects.value[index] = projectData;
+      }
+
+      return { success: true, data: projectData };
+    } catch (err) {
+      error.value = err.message || "Failed to fetch project";
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Create new project
+  async function createProject(projectData, images = []) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await projectsApi.create(projectData, images);
+
+      let newProject;
+      if (response.success) {
+        newProject = response.data || response.project;
+      } else {
+        newProject = response;
+      }
+
+      projects.value.unshift(newProject);
+      return { success: true, data: newProject };
+    } catch (err) {
+      error.value = err.message || "Failed to create project";
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Update project
+  async function updateProject(id, projectData, images = []) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const response = await projectsApi.update(id, projectData, images);
+
+      let updatedProject;
+      if (response.success) {
+        updatedProject = response.data || response.project;
+      } else {
+        updatedProject = response;
+      }
+
+      const index = projects.value.findIndex((p) => p.id === id);
+      if (index !== -1) {
+        projects.value[index] = { ...projects.value[index], ...updatedProject };
+      }
+
+      return { success: true, data: updatedProject };
+    } catch (err) {
+      error.value = err.message || "Failed to update project";
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Delete project
   async function deleteProject(id) {
-    await new Promise(r => setTimeout(r, 300))
-    projects.value = projects.value.filter(p => p.id !== Number(id))
+    loading.value = true;
+    error.value = null;
+
+    try {
+      await projectsApi.delete(id);
+      projects.value = projects.value.filter((p) => p.id !== id);
+      return { success: true };
+    } catch (err) {
+      error.value = err.message || "Failed to delete project";
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
+    }
   }
 
+  // Toggle publish status
   async function togglePublish(id) {
-    const project = projects.value.find(p => p.id === Number(id))
-    if (project) project.published = !project.published
+    const project = projects.value.find((p) => p.id === id);
+    if (project) {
+      const newStatus = !project.published;
+      return await updateProject(id, { published: newStatus });
+    }
+    return { success: false, error: "Project not found" };
   }
 
-  return { projects, loading, totalProjects, publishedProjects, ongoingProjects, getById, createProject, updateProject, deleteProject, togglePublish }
-})
+  // Toggle status (ongoing/completed)
+  async function toggleStatus(id) {
+    const project = projects.value.find((p) => p.id === id);
+    if (project) {
+      const newStatus = project.status === "ongoing" ? "completed" : "ongoing";
+      return await updateProject(id, { status: newStatus });
+    }
+    return { success: false, error: "Project not found" };
+  }
+
+  return {
+    // State
+    projects,
+    loading,
+    error,
+
+    // Getters
+    totalProjects,
+    publishedProjects,
+    ongoingProjects,
+    completedProjects,
+
+    // Actions
+    getById,
+    fetchProjects,
+    fetchProjectById,
+    createProject,
+    updateProject,
+    deleteProject,
+    togglePublish,
+    toggleStatus,
+  };
+});

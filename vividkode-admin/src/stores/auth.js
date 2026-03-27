@@ -8,38 +8,86 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const initialized = ref(false)
 
   // Getters
   const token = computed(() => tokenData.value?.token || null)
   const isAuthenticated = computed(() => {
     const hasToken = !!token.value
     const hasUser = !!user.value
+    console.log('isAuthenticated check:', { hasToken, hasUser, token: token.value })
     return hasToken && hasUser
   })
   
   const userName = computed(() => {
     if (!user.value) return 'Admin'
     if (user.value.name) return user.value.name
-
-    
+    if (user.value.email) {
+      const emailName = user.value.email.split('@')[0]
+      return emailName.charAt(0).toUpperCase() + emailName.slice(1).toLowerCase()
+    }
     return 'Admin'
   })
-  
-  // Get user role
-  const userRole = computed(() => user.value?.role || null)
-  
-  // Get user email
-  const userEmail = computed(() => user.value?.email || null)
 
-  // Initialize from cookies
   function init() {
+    if (initialized.value) return
+    
+    // console.log('Initializing auth store...')
+    
     const storedToken = cookieStorage.get('auth_token')
     const storedUser = cookieStorage.get('user_data')
     
+    // Validate token (check if it's expired or valid)
     if (storedToken && storedUser) {
-      tokenData.value = storedToken
-      user.value = storedUser
+    // Validate token expiration
+      const isValid = validateToken(storedToken.token)
+      
+      if (isValid) {
+        tokenData.value = storedToken
+        user.value = storedUser
+        console.log('Auth initialized with valid token')
+      } else {
+        console.log('Token expired or invalid, clearing auth')
+        clearAuth()
+      }
+    } else {
+      console.log('No stored auth data found')
     }
+    
+    initialized.value = true
+  }
+  
+  function validateToken(token) {
+    if (!token) return false
+    
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const exp = payload.exp
+      
+      if (exp) {
+        // Check if token is expired
+        const isExpired = Date.now() >= exp * 1000
+        if (isExpired) {
+          console.log('Token expired')
+          return false
+        }
+      }
+      
+      return true
+    } catch (error) {
+      // If not JWT or can't decode, assume valid
+      // console.log('Token validation skipped (not JWT)')
+      return true
+    }
+  }
+  
+  // Clear all auth data
+  function clearAuth() {
+    tokenData.value = null
+    user.value = null
+    cookieStorage.remove('auth_token')
+    cookieStorage.remove('user_data')
+    console.log('Auth data cleared')
   }
 
   async function login(credentials) {
@@ -79,9 +127,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function logout() {
     authApi.logout()
-    tokenData.value = null
-    user.value = null
-    error.value = null
+    clearAuth()
   }
 
   // Initialize on store creation
@@ -93,17 +139,17 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     loading,
     error,
+    initialized,
     
     // Getters
     token,
     isAuthenticated,
     userName,
-    userRole,
-    userEmail,
     
     // Actions
     login,
     logout,
-    init
+    init,
+    clearAuth
   }
 })
