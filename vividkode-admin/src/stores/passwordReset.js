@@ -22,7 +22,7 @@ export const usePasswordResetStore = defineStore('passwordReset', () => {
       if (response.success) {
         email.value = userEmail;
         successMessage.value = response.message || 'Reset code sent to your email!';
-        step.value = 'reset'; // Move directly to reset step (includes OTP)
+        step.value = 'reset'; 
         return { success: true, data: response };
       } else {
         error.value = response.message || 'Failed to send reset code';
