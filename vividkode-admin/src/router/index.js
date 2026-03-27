@@ -26,7 +26,7 @@ const routes = [
   {
     path: '/dashboard',
     component: DashboardLayout,
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true }, // Enable this
     children: [
       { path: '', name: 'dashboard', component: DashboardView },
       { path: 'projects', name: 'projects', component: ProjectsView },
@@ -39,9 +39,7 @@ const routes = [
   },
   { 
     path: '/:pathMatch(.*)*', 
-    redirect: (to) => {
-      return '/dashboard'
-    }
+    redirect: '/dashboard'
   }
 ]
 
@@ -50,7 +48,7 @@ const router = createRouter({
   routes,
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) return savedPosition
-    return { top: 0, behavior: 'smooth' }
+    return { top: 0 }
   }
 })
 
@@ -58,9 +56,15 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
   
-  // Check if route requires authentication
+  // Check if the route requires authentication
+  // This checks both parent and child routes
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const isPublic = to.matched.some(record => record.meta.public)
+  
+  // Debug logging (remove in production)
+  console.log('Route:', to.path)
+  console.log('Requires Auth:', requiresAuth)
+  console.log('Is Authenticated:', auth.isAuthenticated)
   
   // If route requires auth and user is not authenticated
   if (requiresAuth && !auth.isAuthenticated) {
@@ -71,9 +75,9 @@ router.beforeEach(async (to, from, next) => {
   } 
   // If user is authenticated and trying to access login page
   else if (to.name === 'login' && auth.isAuthenticated) {
-    // Redirect to dashboard
     next({ name: 'dashboard' })
   } 
+  // For all other cases, proceed
   else {
     next()
   }

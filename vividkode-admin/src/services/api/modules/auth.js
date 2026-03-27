@@ -9,7 +9,7 @@ export const authApi = {
    */
   async login(credentials) {
     try {
-      const response = await apiClient.post('/api/open/auth/login/v1', credentials);
+      const response = await apiClient.post('/api/open/auth/login/v2', credentials);
       
       
       if (response.success && response.data) {
@@ -17,14 +17,16 @@ export const authApi = {
         cookieStorage.set('auth_token', {
           token: response.data.token,
           id: response.data.id,
-          role: response.data.role
+          role: response.data.role,
+          name: response.data.name
         });
         
         // Store user data separately if needed
         cookieStorage.set('user_data', {
           id: response.data.id,
           role: response.data.role,
-          email: credentials.email
+          email: credentials.email,
+          name: response.data.name
         });
         
         return {
