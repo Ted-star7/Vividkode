@@ -11,6 +11,7 @@ const MessagesView = () => import('@/views/MessagesView.vue')
 const ClientsView = () => import('@/views/ClientsView.vue')
 const ContentView = () => import('@/views/ContentView.vue')
 const SettingsView = () => import('@/views/SettingsView.vue')
+const forgotPasswordView = () => import('@/views/ForgotPasswordView.vue')
 
 const routes = [
   {
@@ -20,13 +21,19 @@ const routes = [
     meta: { public: true } 
   },
   {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    component: () => import('@/views/ForgotPasswordView.vue'),
+    meta: { public: true } 
+  },
+  {
     path: '/',
     redirect: '/dashboard'
   },
   {
     path: '/dashboard',
     component: DashboardLayout,
-    meta: { requiresAuth: true }, // Enable this
+    meta: { requiresAuth: true }, 
     children: [
       { path: '', name: 'dashboard', component: DashboardView },
       { path: 'projects', name: 'projects', component: ProjectsView },
@@ -61,10 +68,9 @@ router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const isPublic = to.matched.some(record => record.meta.public)
   
-  // Debug logging (remove in production)
-  console.log('Route:', to.path)
-  console.log('Requires Auth:', requiresAuth)
-  console.log('Is Authenticated:', auth.isAuthenticated)
+  // console.log('Route:', to.path)
+  // console.log('Requires Auth:', requiresAuth)
+  // console.log('Is Authenticated:', auth.isAuthenticated)
   
   // If route requires auth and user is not authenticated
   if (requiresAuth && !auth.isAuthenticated) {
@@ -77,7 +83,6 @@ router.beforeEach(async (to, from, next) => {
   else if (to.name === 'login' && auth.isAuthenticated) {
     next({ name: 'dashboard' })
   } 
-  // For all other cases, proceed
   else {
     next()
   }

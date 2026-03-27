@@ -4,11 +4,12 @@
     <aside
       :class="[
         'fixed inset-y-0 left-0 z-50 flex flex-col bg-navy-950 transition-all duration-300 ease-in-out',
-        sidebarOpen ? 'w-64' : 'w-16',
+        sidebarOpen ? 'w-64' : 'w-0 lg:w-16',
         'lg:relative lg:flex',
+        isMobile && !sidebarOpen ? '-translate-x-full' : 'translate-x-0',
       ]"
     >
-      <!-- Logo -->
+      <!-- Logo (hide when collapsed on mobile) -->
       <div class="flex items-center h-16 px-4 border-b border-white/8 shrink-0">
         <div class="flex items-center gap-3 overflow-hidden">
           <div
@@ -49,7 +50,7 @@
           v-slot="{ isActive, navigate }"
         >
           <div
-            @click="navigate"
+            @click="handleNavClick(navigate)"
             :class="[
               'flex items-center gap-3 px-2 py-2.5 rounded-lg cursor-pointer transition-all duration-150 group',
               isActive
@@ -84,7 +85,7 @@
       <!-- User / Toggle -->
       <div class="border-t border-white/8 p-3 space-y-2 shrink-0">
         <button
-          @click="sidebarOpen = !sidebarOpen"
+          @click="toggleSidebar"
           class="flex items-center gap-3 px-2 py-2 rounded-lg text-navy-400 hover:text-white hover:bg-white/8 transition-all w-full"
         >
           <span class="text-lg w-5 flex items-center justify-center shrink-0">{{
@@ -102,7 +103,7 @@
           <div
             class="w-7 h-7 bg-gold-500 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
           >
-            {{ auth.user?.avatar || "U" }}
+            {{ auth.user?.avatar || getUserInitials() }}
           </div>
           <Transition name="slide-fade">
             <div v-if="sidebarOpen" class="overflow-hidden flex-1">
@@ -111,7 +112,9 @@
               </div>
               <div class="text-navy-400 text-[10px] truncate">
                 {{
-                  auth.user?.role === "SUPER_ADMIN" ? "superAdmin" : "Editor"
+                  auth.user?.role?.toLowerCase() === "super_admin"
+                    ? "Super Admin"
+                    : "Editor"
                 }}
               </div>
             </div>
@@ -121,17 +124,24 @@
     </aside>
 
     <!-- Main content -->
-    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <div
+      class="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300"
+      :class="{
+        'lg:ml-0': true,
+        'ml-0': !sidebarOpen || isMobile,
+      }"
+    >
       <!-- Topbar -->
       <header
         class="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 shadow-sm"
       >
         <div class="flex items-center gap-4">
+          <!-- Hamburger button for mobile -->
           <button
             class="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-            @click="sidebarOpen = !sidebarOpen"
+            @click="toggleSidebar"
           >
-            <span class="text-navy-600">☰</span>
+            <span class="text-navy-600 text-xl">☰</span>
           </button>
           <div>
             <h2 class="font-display text-base font-semibold text-navy-900">
@@ -182,7 +192,7 @@
               <div
                 class="w-8 h-8 bg-navy-900 rounded-lg flex items-center justify-center text-white text-xs font-bold"
               >
-                {{ auth.user?.avatar }}
+                {{ auth.user?.avatar || getUserInitials() }}
               </div>
             </button>
             <Transition name="dropdown">
@@ -191,8 +201,8 @@
                 class="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-card-hover border border-gray-100 py-1.5 z-50"
               >
                 <RouterLink
-                  to="/settings"
-                  @click="userMenuOpen = false"
+                  to="/dashboard/settings"
+                  @click="closeUserMenu"
                   class="flex items-center gap-2.5 px-4 py-2 text-sm text-navy-700 hover:bg-gray-50 transition-colors"
                 >
                   <span>⚙️</span> Settings
@@ -225,14 +235,14 @@
       <div
         v-if="sidebarOpen && isMobile"
         class="fixed inset-0 bg-black/50 z-40 lg:hidden"
-        @click="sidebarOpen = false"
+        @click="closeSidebar"
       ></div>
     </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter, RouterLink, RouterView } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useMessagesStore } from "@/stores/messages";
@@ -248,6 +258,16 @@ const userMenuOpen = ref(false);
 const notifOpen = ref(false);
 const isMobile = ref(false);
 
+// Watch for route changes to close mobile sidebar
+watch(
+  () => route.path,
+  () => {
+    if (isMobile.value) {
+      closeSidebar();
+    }
+  },
+);
+
 const navItems = computed(() => [
   { name: "dashboard", path: "/dashboard", icon: "📊", label: "Dashboard" },
   {
@@ -255,22 +275,22 @@ const navItems = computed(() => [
     path: "/dashboard/projects",
     icon: "📁",
     label: "Projects",
-  }, // Fixed
+  },
   {
     name: "messages",
     path: "/dashboard/messages",
     icon: "📩",
     label: "Messages",
     badge: messagesStore.unreadCount || null,
-  }, // Fixed
-  { name: "clients", path: "/dashboard/clients", icon: "👥", label: "Clients" }, // Fixed
-  { name: "content", path: "/dashboard/content", icon: "🧭", label: "Content" }, // Fixed
+  },
+  { name: "clients", path: "/dashboard/clients", icon: "👥", label: "Clients" },
+  { name: "content", path: "/dashboard/content", icon: "🧭", label: "Content" },
   {
     name: "settings",
     path: "/dashboard/settings",
     icon: "⚙️",
     label: "Settings",
-  }, // Fixed
+  },
 ]);
 
 const routeTitles = {
@@ -285,19 +305,80 @@ const routeTitles = {
 
 const currentPageTitle = computed(() => routeTitles[route.name] || "Dashboard");
 
+// Helper function to get user initials
+function getUserInitials() {
+  if (!auth.user?.name) return "U";
+  return auth.user.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+// Toggle sidebar with mobile awareness
+function toggleSidebar() {
+  sidebarOpen.value = !sidebarOpen.value;
+  // On desktop, remember the state
+  if (!isMobile.value) {
+    localStorage.setItem("sidebarOpen", sidebarOpen.value);
+  }
+}
+
+// Close sidebar (for mobile)
+function closeSidebar() {
+  if (isMobile.value) {
+    sidebarOpen.value = false;
+  }
+}
+
+// Handle navigation click - close sidebar on mobile
+function handleNavClick(navigate) {
+  navigate();
+  if (isMobile.value) {
+    closeSidebar();
+  }
+}
+
+function closeUserMenu() {
+  userMenuOpen.value = false;
+}
+
 function handleLogout() {
   auth.logout();
   router.push("/login");
 }
 
 function checkMobile() {
+  const wasMobile = isMobile.value;
   isMobile.value = window.innerWidth < 1024;
-  if (isMobile.value) sidebarOpen.value = false;
+
+  // Handle sidebar state when switching between mobile and desktop
+  if (wasMobile !== isMobile.value) {
+    if (isMobile.value) {
+      // Switching to mobile - close sidebar by default
+      sidebarOpen.value = false;
+    } else {
+      // Switching to desktop - restore saved state or default to open
+      const savedState = localStorage.getItem("sidebarOpen");
+      sidebarOpen.value = savedState !== null ? savedState === "true" : true;
+    }
+  }
 }
 
 onMounted(() => {
+  // Restore sidebar state from localStorage on desktop
+  if (!isMobile.value) {
+    const savedState = localStorage.getItem("sidebarOpen");
+    if (savedState !== null) {
+      sidebarOpen.value = savedState === "true";
+    }
+  }
+
   checkMobile();
   window.addEventListener("resize", checkMobile);
+
+  // Close dropdowns when clicking outside
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".relative")) {
       userMenuOpen.value = false;
@@ -305,7 +386,10 @@ onMounted(() => {
     }
   });
 });
-onUnmounted(() => window.removeEventListener("resize", checkMobile));
+
+onUnmounted(() => {
+  window.removeEventListener("resize", checkMobile);
+});
 </script>
 
 <style scoped>
@@ -360,5 +444,12 @@ onUnmounted(() => window.removeEventListener("resize", checkMobile));
 .page-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+/* Mobile sidebar transition */
+@media (max-width: 1023px) {
+  aside {
+    transition: transform 0.3s ease-in-out;
+  }
 }
 </style>

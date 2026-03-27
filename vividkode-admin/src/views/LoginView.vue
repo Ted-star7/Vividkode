@@ -210,7 +210,22 @@
             </svg>
           </button>
         </form>
-
+        ----------Forgot password link (optional) ----------
+        <div class="flex items-center justify-between mt-4">
+          <label class="flex items-center gap-2 text-sm text-navy-300">
+            <input
+              type="checkbox"
+              class="rounded border-white/20 bg-white/10"
+            />
+            Remember me
+          </label>
+          <RouterLink
+            to="/forgot-password"
+            class="text-sm text-gold-400 hover:text-gold-300 transition-colors"
+          >
+            Forgot Password?
+          </RouterLink>
+        </div>
         <p class="form-footer">Secure access · VividKode Admin</p>
       </div>
     </div>
@@ -221,6 +236,7 @@
 import { ref, reactive } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { RouterLink } from 'vue-router';
 
 const router = useRouter();
 const route = useRoute();

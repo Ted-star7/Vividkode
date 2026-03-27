@@ -1,19 +1,16 @@
 import apiClient from '../client';
 import { cookieStorage } from '../../storage/cookie';
+import { API_ENDPOINTS } from '../endpoints';
 
 export const authApi = {
   /**
    * Login user with email and password
-   * @param {Object} credentials - { email, password }
-   * @returns {Promise} - Login response
    */
   async login(credentials) {
     try {
-      const response = await apiClient.post('/api/open/auth/login/v2', credentials);
-      
+      const response = await apiClient.post(API_ENDPOINTS.LOGIN_V2, credentials);
       
       if (response.success && response.data) {
-        // Store token in cookie
         cookieStorage.set('auth_token', {
           token: response.data.token,
           id: response.data.id,
@@ -21,7 +18,6 @@ export const authApi = {
           name: response.data.name
         });
         
-        // Store user data separately if needed
         cookieStorage.set('user_data', {
           id: response.data.id,
           role: response.data.role,
@@ -48,11 +44,8 @@ export const authApi = {
    * Logout user
    */
   async logout() {
-      {
-      // Clear all auth cookies
-      cookieStorage.remove('auth_token');
-      cookieStorage.remove('user_data');
-    }
+    cookieStorage.remove('auth_token');
+    cookieStorage.remove('user_data');
   },
   
   /**
@@ -95,5 +88,47 @@ export const authApi = {
   getUserId() {
     const tokenData = cookieStorage.get('auth_token');
     return tokenData?.id || null;
+  },
+
+  /**
+   * Forgot password - Request OTP/reset link
+   * @param {Object} data - { email }
+   */
+  async forgotPassword(email) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.FORGOT_PASSWORD, { email });
+      return response;
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Reset password - Set new password using OTP
+   * @param {Object} data - { email, otp, newPassword }
+   */
+  async resetPassword(data) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.RESET_PASSWORD, data);
+      return response;
+    } catch (error) {
+      console.error('Reset password error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Resend OTP for password reset
+   * @param {Object} data - { email }
+   */
+  async resendOtp(email) {
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.RESEND_OTP, { email });
+      return response;
+    } catch (error) {
+      console.error('Resend OTP error:', error);
+      throw error;
+    }
   }
 };
