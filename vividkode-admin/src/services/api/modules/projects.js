@@ -2,9 +2,6 @@ import apiClient from '../client';
 import { API_ENDPOINTS } from '../endpoints';
 
 export const projectsApi = {
-  /**
-   * Get all projects
-   */
   async getAll() {
     try {
       const response = await apiClient.get(API_ENDPOINTS.PROJECTS.LIST);
@@ -15,9 +12,6 @@ export const projectsApi = {
     }
   },
   
-  /**
-   * Get project by ID
-   */
   async getById(id) {
     try {
       const response = await apiClient.get(API_ENDPOINTS.PROJECTS.DETAIL(id));
@@ -28,17 +22,40 @@ export const projectsApi = {
     }
   },
   
-  /**
-   * Create a new project
-   */
- async create(projectData, images = []) {
+  async create(projectData, images = []) {
     try {
-      // The API expects projectData as Query Parameters and images as a JSON body
-      const response = await apiClient.post(
-        API_ENDPOINTS.PROJECTS.CREATE, 
-        { images: images }, // JSON Body
-        { params: projectData } // Axios automatically builds the ?title=...&status=... string
-      );
+      const formData = new FormData();
+      
+      // Log what we're sending
+      console.log('Creating project with data:', projectData);
+      console.log('Images count:', images.length);
+      
+      // Append all fields - IMPORTANT: Match exact field names expected by backend
+      if (projectData.title) formData.append('title', projectData.title);
+      if (projectData.clientName) formData.append('clientName', projectData.clientName);
+      if (projectData.category) formData.append('category', projectData.category);
+      if (projectData.projectDescription) formData.append('projectDescription', projectData.projectDescription);
+      if (projectData.projectType) formData.append('projectType', projectData.projectType);
+      if (projectData.projectLink) formData.append('projectLink', projectData.projectLink);
+      if (projectData.status) formData.append('status', projectData.status);
+      if (projectData.techStack) formData.append('techStack', projectData.techStack);
+      
+      // Append images
+      images.forEach((image, index) => {
+        // If image is Base64 string, convert to Blob
+        if (typeof image === 'string' && image.startsWith('data:image')) {
+          const blob = base64ToBlob(image);
+          formData.append('images', blob, `image_${index}.jpg`);
+        } else if (image instanceof File) {
+          formData.append('images', image);
+        }
+      });
+      
+      const response = await apiClient.post(API_ENDPOINTS.PROJECTS.CREATE, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
       
       return response;
     } catch (error) {
@@ -47,21 +64,26 @@ export const projectsApi = {
     }
   },
   
-  /**
-   * Update an existing project
-   */
   async update(id, projectData, images = []) {
     try {
       const formData = new FormData();
       
-      Object.keys(projectData).forEach(key => {
-        if (projectData[key] !== undefined && projectData[key] !== null) {
-          formData.append(key, projectData[key]);
-        }
-      });
+      if (projectData.title) formData.append('title', projectData.title);
+      if (projectData.clientName) formData.append('clientName', projectData.clientName);
+      if (projectData.category) formData.append('category', projectData.category);
+      if (projectData.projectDescription) formData.append('projectDescription', projectData.projectDescription);
+      if (projectData.projectType) formData.append('projectType', projectData.projectType);
+      if (projectData.projectLink) formData.append('projectLink', projectData.projectLink);
+      if (projectData.status) formData.append('status', projectData.status);
+      if (projectData.techStack) formData.append('techStack', projectData.techStack);
       
       images.forEach((image, index) => {
-        formData.append('images', image);
+        if (typeof image === 'string' && image.startsWith('data:image')) {
+          const blob = base64ToBlob(image);
+          formData.append('images', blob, `image_${index}.jpg`);
+        } else if (image instanceof File) {
+          formData.append('images', image);
+        }
       });
       
       const response = await apiClient.put(API_ENDPOINTS.PROJECTS.UPDATE(id), formData, {
@@ -77,9 +99,6 @@ export const projectsApi = {
     }
   },
   
-  /**
-   * Delete a project
-   */
   async delete(id) {
     try {
       const response = await apiClient.delete(API_ENDPOINTS.PROJECTS.DELETE(id));
@@ -90,3 +109,18 @@ export const projectsApi = {
     }
   }
 };
+
+// Helper function to convert Base64 to Blob
+function base64ToBlob(base64) {
+  const parts = base64.split(';base64,');
+  const contentType = parts[0].split(':')[1];
+  const raw = window.atob(parts[1]);
+  const rawLength = raw.length;
+  const uInt8Array = new Uint8Array(rawLength);
+  
+  for (let i = 0; i < rawLength; ++i) {
+    uInt8Array[i] = raw.charCodeAt(i);
+  }
+  
+  return new Blob([uInt8Array], { type: contentType });
+}

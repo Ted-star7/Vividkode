@@ -57,13 +57,25 @@
       <div
         v-for="project in filteredProjects"
         :key="project.id"
-        class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer"
+        class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col"
         @click="$router.push(`/projects/${project.id}`)"
       >
         <div
-          :class="['h-2 rounded-t-xl', getCategoryGradient(project.category)]"
+          v-if="project.images && project.images.length > 0"
+          class="w-full h-48 relative overflow-hidden bg-gray-100"
+        >
+          <img
+            :src="project.images[0]"
+            :alt="project.title"
+            class="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+          />
+        </div>
+        <div
+          v-else
+          :class="['h-2 w-full', getCategoryGradient(project.category)]"
         ></div>
-        <div class="p-5">
+
+        <div class="p-5 flex-1 flex flex-col">
           <div class="flex items-start justify-between mb-3">
             <div class="flex-1 min-w-0">
               <h3 class="font-semibold text-navy-800 text-sm truncate">
@@ -75,7 +87,7 @@
             </div>
             <span
               :class="[
-                'px-2 py-1 rounded-full text-[10px] font-medium',
+                'px-2 py-1 rounded-full text-[10px] font-medium ml-2 shrink-0',
                 project.projectType === 'completed'
                   ? 'bg-green-100 text-green-700'
                   : 'bg-yellow-100 text-yellow-700',
@@ -84,7 +96,7 @@
               {{ project.projectType }}
             </span>
           </div>
-          <p class="text-xs text-gray-500 line-clamp-2 mb-4">
+          <p class="text-xs text-gray-500 line-clamp-2 mb-4 flex-1">
             {{ project.projectDescription }}
           </p>
           <div class="flex flex-wrap gap-1 mb-4">
@@ -113,13 +125,15 @@
             <div class="flex items-center gap-1" @click.stop>
               <button
                 @click="openEdit(project)"
-                class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-navy-700"
+                class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-navy-700 transition-colors"
+                title="Edit Project"
               >
                 ✏️
               </button>
               <button
                 @click="confirmDelete(project)"
-                class="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600"
+                class="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                title="Delete Project"
               >
                 🗑
               </button>
@@ -234,7 +248,7 @@
                 v-if="selectedImages.length"
                 class="text-xs text-gray-500 mt-2"
               >
-                {{ selectedImages.length }} file(s) selected
+                {{ selectedImages.length }} file(s) selected ready to upload
               </p>
             </div>
 
@@ -402,6 +416,15 @@ function handleImageUpload(event) {
   selectedImages.value = Array.from(event.target.files);
 }
 
+// Convert file to Base64
+const toBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+  });
+
 function openCreate() {
   isEditing.value = false;
   Object.assign(form, {
@@ -422,51 +445,11 @@ function openEdit(project) {
   isEditing.value = true;
   Object.assign(form, { ...project });
   techStackInput.value = project.techStack || "";
-  selectedImages.value = []; // Reset images so we don't accidentally re-upload old ones
+  selectedImages.value = [];
   showModal.value = true;
 }
 
-async function saveProject() {
-  const data = {
-    ...form,
-    techStack: techStackInput.value
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .join(", "),
-  };
-
-  if (isEditing.value) {
-    await projectsStore.updateProject(form.id, data, selectedImages.value);
-  } else {
-    await projectsStore.createProject(data, selectedImages.value);
-  }
-
-  showModal.value = false;
-}
-
-function confirmDelete(project) {
-  deleteTarget.value = project;
-}
-
-async function doDelete() {
-  await projectsStore.deleteProject(deleteTarget.value.id);
-  deleteTarget.value = null;
-}
-
-onMounted(() => {
-  projectsStore.fetchProjects();
-});
-
-const toBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = (error) => reject(error);
-  });
-
-// 2. Update your saveProject function to use it
+// Single saveProject function
 async function saveProject() {
   const data = {
     ...form,
@@ -478,7 +461,7 @@ async function saveProject() {
   };
 
   try {
-    // Convert all selected raw File objects into Base64 strings
+    // Convert selected images to Base64
     const base64Images = await Promise.all(
       selectedImages.value.map((file) => toBase64(file)),
     );
@@ -494,6 +477,19 @@ async function saveProject() {
     console.error("Failed to save project:", err);
   }
 }
+
+function confirmDelete(project) {
+  deleteTarget.value = project;
+}
+
+async function doDelete() {
+  await projectsStore.deleteProject(deleteTarget.value.id);
+  deleteTarget.value = null;
+}
+
+onMounted(() => {
+  projectsStore.fetchProjects();
+});
 </script>
 
 <style scoped>

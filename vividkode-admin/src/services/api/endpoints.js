@@ -18,11 +18,13 @@ export const API_ENDPOINTS = {
     CREATE: '/api/projects/create',
     UPDATE: (id) => `/api/projects/update/${id}`,
     DELETE: (id) => `/api/projects/delete/${id}`,
+    STATS: '/api/projects/stats'
   },
   USERS: {
     LIST: '/api/users',
     DETAIL: (id) => `/api/users/${id}`,
     UPDATE: (id) => `/api/users/${id}`,
     DELETE: (id) => `/api/users/${id}`,
+
   }
 };

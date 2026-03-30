@@ -9,13 +9,11 @@ export const authApi = {
    */
   async login(credentials) {
     try {
-      // 1. Assign the result directly to apiResponse
       const apiResponse = await apiClient.post(
         API_ENDPOINTS.AUTH.LOGIN_V2,
         credentials
       )
 
-      // 2. Now apiResponse is defined and we can check it
       if (apiResponse.success) {
         const payload = apiResponse.data
 
@@ -47,7 +45,6 @@ export const authApi = {
 
       return {
         success: false,
-        // Updated this to match how your client.js formats errors
         message: error.message || 'Login failed'
       }
     }

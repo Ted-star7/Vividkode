@@ -6,39 +6,75 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // Send credentials (cookies) with every request
   withCredentials: true,
 });
 
 // Request interceptor - Add token to header
 apiClient.interceptors.request.use(
   (config) => {
-    // FIX: Read the token directly as a string, since it was saved as a string
     const token = cookieStorage.get('auth_token');
     
+    console.log('📤 Request:', {
+      url: config.url,
+      method: config.method,
+      hasToken: !!token,
+      tokenType: typeof token,
+      tokenPreview: token ? `${token.substring(0, 50)}...` : 'none'
+    });
+    
     if (token) {
+     
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('✅ Authorization header set');
+    } else {
+      // console.log('❌ No token found in cookies');
     }
+  
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+      console.log('📎 FormData detected, removed Content-Type header');
+    }
+    
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('Request interceptor error:', error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor - Handle responses
 apiClient.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    console.log('📥 Response:', {
+      url: response.config.url,
+      status: response.status,
+      success: response.data?.success
+    });
+    return response.data;
+  },
   (error) => {
+    console.error('❌ API Error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
+      console.log('🔒 401 Unauthorized - Clearing auth data');
       cookieStorage.remove('auth_token');
       cookieStorage.remove('user_data');
-
+      
+      // Redirect to login if not already there
       if (window.location.pathname !== '/login') {
+        console.log('Redirecting to login...');
         window.location.href = '/login';
       }
     }
     
-    // Error Handling
+    // Format error for easier handling
     const formattedError = {
       message: error.response?.data?.message || error.message,
       status: error.response?.status,

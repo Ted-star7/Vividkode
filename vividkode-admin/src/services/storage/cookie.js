@@ -1,7 +1,6 @@
 import Cookies from 'js-cookie';
 
 export const cookieStorage = {
-
   /**
    * Set a cookie
    * @param {string} key
@@ -11,10 +10,10 @@ export const cookieStorage = {
   set(key, value, options = {}) {
     try {
       const defaultOptions = {
-        expires: 7, // days
+        expires: 7, 
         path: '/',
         secure: window.location.protocol === 'https:', // works for localhost + production
-        sameSite: 'Lax', // safer for APIs
+        sameSite: 'Lax', 
       };
 
       const cookieValue =
@@ -87,5 +86,7 @@ export const cookieStorage = {
   exists(key) {
     return Cookies.get(key) !== undefined;
   }
-
 };
+
+// Also export as default for compatibility
+export default cookieStorage;
