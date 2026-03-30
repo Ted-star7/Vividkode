@@ -3,153 +3,205 @@ import { ref, computed } from 'vue'
 import { authApi, cookieStorage } from '@/services'
 
 export const useAuthStore = defineStore('auth', () => {
-  // State
-  const tokenData = ref(null)
+
+  /* =========================
+     STATE
+  ========================= */
+
+  const token = ref(null)
   const user = ref(null)
   const loading = ref(false)
   const error = ref(null)
   const initialized = ref(false)
 
-  // Getters
-  const token = computed(() => tokenData.value?.token || null)
+
+  /* =========================
+     GETTERS
+  ========================= */
+
   const isAuthenticated = computed(() => {
-    const hasToken = !!token.value
-    const hasUser = !!user.value
-    console.log('isAuthenticated check:', { hasToken, hasUser, token: token.value })
-    return hasToken && hasUser
+    return !!token.value
   })
-  
+
   const userName = computed(() => {
     if (!user.value) return 'Admin'
+
     if (user.value.name) return user.value.name
+
     if (user.value.email) {
       const emailName = user.value.email.split('@')[0]
-      return emailName.charAt(0).toUpperCase() + emailName.slice(1).toLowerCase()
+      return emailName.charAt(0).toUpperCase() + emailName.slice(1)
     }
+
     return 'Admin'
   })
 
+
+  /* =========================
+     INIT AUTH FROM COOKIES
+  ========================= */
+
   function init() {
     if (initialized.value) return
-    
-    // console.log('Initializing auth store...')
-    
+
     const storedToken = cookieStorage.get('auth_token')
     const storedUser = cookieStorage.get('user_data')
-    
-    // Validate token (check if it's expired or valid)
-    if (storedToken && storedUser) {
-    // Validate token expiration
-      const isValid = validateToken(storedToken.token)
-      
-      if (isValid) {
-        tokenData.value = storedToken
-        user.value = storedUser
-        console.log('Auth initialized with valid token')
-      } else {
-        console.log('Token expired or invalid, clearing auth')
-        clearAuth()
-      }
+
+    if (storedToken && validateToken(storedToken)) {
+      token.value = storedToken
+      user.value = storedUser
+      console.log('Auth initialized from cookies')
     } else {
-      console.log('No stored auth data found')
+      clearAuth()
+      console.log('No valid auth session')
     }
-    
+
     initialized.value = true
   }
-  
-  function validateToken(token) {
-    if (!token) return false
-    
+
+
+  /* =========================
+     VALIDATE JWT TOKEN
+  ========================= */
+
+  function validateToken(jwt) {
+    if (!jwt) return false
+
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
+      const payload = JSON.parse(atob(jwt.split('.')[1]))
       const exp = payload.exp
-      
-      if (exp) {
-        // Check if token is expired
-        const isExpired = Date.now() >= exp * 1000
-        if (isExpired) {
-          console.log('Token expired')
-          return false
-        }
-      }
-      
-      return true
-    } catch (error) {
-      // If not JWT or can't decode, assume valid
-      // console.log('Token validation skipped (not JWT)')
+
+      if (!exp) return true
+
+      const isExpired = Date.now() >= exp * 1000
+      return !isExpired
+
+    } catch (err) {
+      console.warn('Token validation skipped')
       return true
     }
   }
-  
-  // Clear all auth data
-  function clearAuth() {
-    tokenData.value = null
-    user.value = null
-    cookieStorage.remove('auth_token')
-    cookieStorage.remove('user_data')
-    console.log('Auth data cleared')
-  }
+
+
+  /* =========================
+     LOGIN
+  ========================= */
 
   async function login(credentials) {
+
     loading.value = true
     error.value = null
-    
+
     try {
+
       const response = await authApi.login(credentials)
-      
-      if (response.success) {
-        // Update state from cookies
-        tokenData.value = cookieStorage.get('auth_token')
-        user.value = cookieStorage.get('user_data')
-        
-        return {
-          success: true,
-          data: response.data,
-          message: response.message
-        }
-      } else {
-        error.value = response.message || 'Login failed'
-        return {
-          success: false,
-          error: error.value
-        }
+
+      if (!response.success) {
+        throw new Error(response.message || 'Login failed')
       }
+
+      const payload = response.data
+
+      /* Save cookies */
+
+      cookieStorage.set('auth_token', payload.token)
+
+      cookieStorage.set('user_data', {
+        id: payload.id,
+        role: payload.role,
+        name: payload.name,
+        email: credentials.email
+      })
+
+      /* Update store */
+
+      token.value = payload.token
+
+      user.value = {
+        id: payload.id,
+        role: payload.role,
+        name: payload.name,
+        email: credentials.email
+      }
+
+      return {
+        success: true,
+        data: payload,
+        message: response.message
+      }
+
     } catch (err) {
-      error.value = err.message || 'An error occurred during login'
+
+      error.value = err.message || 'Login failed'
+
       return {
         success: false,
         error: error.value
       }
+
     } finally {
       loading.value = false
     }
   }
 
+
+  /* =========================
+     LOGOUT
+  ========================= */
+
   function logout() {
+
     authApi.logout()
+
     clearAuth()
   }
 
-  // Initialize on store creation
+
+  /* =========================
+     CLEAR AUTH
+  ========================= */
+
+  function clearAuth() {
+
+    token.value = null
+    user.value = null
+
+    cookieStorage.remove('auth_token')
+    cookieStorage.remove('user_data')
+
+    console.log('Auth cleared')
+  }
+
+
+  /* =========================
+     INITIALIZE STORE
+  ========================= */
+
   init()
 
+
   return {
-    // State
-    tokenData,
+
+    /* state */
+
+    token,
     user,
     loading,
     error,
     initialized,
-    
-    // Getters
-    token,
+
+    /* getters */
+
     isAuthenticated,
     userName,
-    
-    // Actions
+
+    /* actions */
+
     login,
     logout,
     init,
     clearAuth
+
   }
+
 })

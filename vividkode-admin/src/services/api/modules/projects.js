@@ -31,25 +31,14 @@ export const projectsApi = {
   /**
    * Create a new project
    */
-  async create(projectData, images = []) {
+ async create(projectData, images = []) {
     try {
-      const formData = new FormData();
-      
-      Object.keys(projectData).forEach(key => {
-        if (projectData[key] !== undefined && projectData[key] !== null) {
-          formData.append(key, projectData[key]);
-        }
-      });
-      
-      images.forEach((image, index) => {
-        formData.append('images', image);
-      });
-      
-      const response = await apiClient.post(API_ENDPOINTS.PROJECTS.CREATE, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // The API expects projectData as Query Parameters and images as a JSON body
+      const response = await apiClient.post(
+        API_ENDPOINTS.PROJECTS.CREATE, 
+        { images: images }, // JSON Body
+        { params: projectData } // Axios automatically builds the ?title=...&status=... string
+      );
       
       return response;
     } catch (error) {

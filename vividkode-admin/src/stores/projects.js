@@ -10,14 +10,21 @@ export const useProjectsStore = defineStore("projects", () => {
 
   // Getters
   const totalProjects = computed(() => projects.value.length);
-  const publishedProjects = computed(() =>
-    projects.value.filter((p) => p.published)
+  
+  
+  const publicProjects = computed(() =>
+    projects.value.filter((p) => p.status === "public")
   );
+  const privateProjects = computed(() =>
+    projects.value.filter((p) => p.status === "private")
+  );
+  
+  // NEW: Filter by 'projectType' instead of the old status
   const ongoingProjects = computed(() =>
-    projects.value.filter((p) => p.status === "ongoing")
+    projects.value.filter((p) => p.projectType === "ongoing")
   );
   const completedProjects = computed(() =>
-    projects.value.filter((p) => p.status === "completed")
+    projects.value.filter((p) => p.projectType === "completed")
   );
 
   // Helper: Get project by ID
@@ -153,46 +160,42 @@ export const useProjectsStore = defineStore("projects", () => {
     }
   }
 
-  // Toggle publish status
-  async function togglePublish(id) {
+  // Toggle Visibility (Public/Private)
+  async function toggleVisibility(id) {
     const project = projects.value.find((p) => p.id === id);
     if (project) {
-      const newStatus = !project.published;
-      return await updateProject(id, { published: newStatus });
-    }
-    return { success: false, error: "Project not found" };
-  }
-
-  // Toggle status (ongoing/completed)
-  async function toggleStatus(id) {
-    const project = projects.value.find((p) => p.id === id);
-    if (project) {
-      const newStatus = project.status === "ongoing" ? "completed" : "ongoing";
+      const newStatus = project.status === "public" ? "private" : "public";
       return await updateProject(id, { status: newStatus });
     }
     return { success: false, error: "Project not found" };
   }
 
+  // Toggle Project Type (Ongoing/Completed)
+  async function toggleProjectType(id) {
+    const project = projects.value.find((p) => p.id === id);
+    if (project) {
+      const newType = project.projectType === "ongoing" ? "completed" : "ongoing";
+      return await updateProject(id, { projectType: newType });
+    }
+    return { success: false, error: "Project not found" };
+  }
+
   return {
-    // State
     projects,
     loading,
     error,
-
-    // Getters
     totalProjects,
-    publishedProjects,
+    publicProjects,
+    privateProjects,
     ongoingProjects,
     completedProjects,
-
-    // Actions
     getById,
     fetchProjects,
     fetchProjectById,
     createProject,
     updateProject,
     deleteProject,
-    togglePublish,
-    toggleStatus,
+    toggleVisibility,
+    toggleProjectType,
   };
 });

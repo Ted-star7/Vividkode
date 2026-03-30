@@ -1,134 +1,192 @@
-import apiClient from '../client';
-import { cookieStorage } from '../../storage/cookie';
-import { API_ENDPOINTS } from '../endpoints';
+import apiClient from '../client'
+import { cookieStorage } from '../../storage/cookie'
+import { API_ENDPOINTS } from '../endpoints'
 
 export const authApi = {
+
   /**
-   * Login user with email and password
+   * Login user
    */
   async login(credentials) {
     try {
-      const response = await apiClient.post(API_ENDPOINTS.LOGIN_V2, credentials);
-      
-      if (response.success && response.data) {
-        cookieStorage.set('auth_token', {
-          token: response.data.token,
-          id: response.data.id,
-          role: response.data.role,
-          name: response.data.name
-        });
-        
+      // 1. Assign the result directly to apiResponse
+      const apiResponse = await apiClient.post(
+        API_ENDPOINTS.AUTH.LOGIN_V2,
+        credentials
+      )
+
+      // 2. Now apiResponse is defined and we can check it
+      if (apiResponse.success) {
+        const payload = apiResponse.data
+
+        // Save token
+        cookieStorage.set('auth_token', payload.token)
+
+        // Save user information
         cookieStorage.set('user_data', {
-          id: response.data.id,
-          role: response.data.role,
-          email: credentials.email,
-          name: response.data.name
-        });
-        
+          id: payload.id,
+          role: payload.role,
+          name: payload.name,
+          email: credentials.email
+        })
+
         return {
           success: true,
-          data: response.data,
-          message: response.message
-        };
+          data: payload,
+          message: apiResponse.message
+        }
       }
-      
-      return response;
-      
+
+      return {
+        success: false,
+        message: apiResponse.message || 'Login failed'
+      }
+
     } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+      console.error('Login error:', error)
+
+      return {
+        success: false,
+        // Updated this to match how your client.js formats errors
+        message: error.message || 'Login failed'
+      }
     }
   },
-  
+
   /**
    * Logout user
    */
   async logout() {
-    cookieStorage.remove('auth_token');
-    cookieStorage.remove('user_data');
+
+    cookieStorage.remove('auth_token')
+    cookieStorage.remove('user_data')
+
+    return true
+
   },
-  
+
   /**
-   * Get current user from stored cookie
+   * Get current logged in user
    */
   getCurrentUser() {
-    const tokenData = cookieStorage.get('auth_token');
-    const userData = cookieStorage.get('user_data');
-    
-    if (tokenData && userData) {
-      return {
-        id: tokenData.id || userData.id,
-        role: tokenData.role || userData.role,
-        email: userData.email,
-        token: tokenData.token
-      };
+
+    const token = cookieStorage.get('auth_token')
+    const user = cookieStorage.get('user_data')
+
+    if (!token || !user) {
+      return null
     }
-    return null;
+
+    return {
+      ...user,
+      token
+    }
+
   },
-  
+
   /**
-   * Check if user is authenticated
+   * Check if authenticated
    */
   isAuthenticated() {
-    const tokenData = cookieStorage.get('auth_token');
-    return !!(tokenData && tokenData.token);
+
+    const token = cookieStorage.get('auth_token')
+
+    return !!token
+
   },
-  
+
   /**
    * Get user role
    */
   getUserRole() {
-    const tokenData = cookieStorage.get('auth_token');
-    return tokenData?.role || null;
+
+    const user = cookieStorage.get('user_data')
+
+    return user?.role || null
+
   },
-  
+
   /**
    * Get user ID
    */
   getUserId() {
-    const tokenData = cookieStorage.get('auth_token');
-    return tokenData?.id || null;
+
+    const user = cookieStorage.get('user_data')
+
+    return user?.id || null
+
   },
 
   /**
-   * Forgot password - Request OTP/reset link
-   * @param {Object} data - { email }
+   * Forgot password
    */
   async forgotPassword(email) {
+
     try {
-      const response = await apiClient.post(API_ENDPOINTS.FORGOT_PASSWORD, { email });
-      return response;
+
+      const response = await apiClient.post(
+        API_ENDPOINTS.FORGOT_PASSWORD,
+        { email }
+      )
+
+      return response.data
+
     } catch (error) {
-      console.error('Forgot password error:', error);
-      throw error;
+
+      console.error('Forgot password error:', error)
+
+      throw error
+
     }
+
   },
 
   /**
-   * Reset password - Set new password using OTP
-   * @param {Object} data - { email, otp, newPassword }
+   * Reset password
    */
   async resetPassword(data) {
+
     try {
-      const response = await apiClient.post(API_ENDPOINTS.RESET_PASSWORD, data);
-      return response;
+
+      const response = await apiClient.post(
+        API_ENDPOINTS.RESET_PASSWORD,
+        data
+      )
+
+      return response.data
+
     } catch (error) {
-      console.error('Reset password error:', error);
-      throw error;
+
+      console.error('Reset password error:', error)
+
+      throw error
+
     }
+
   },
 
   /**
-   * Resend OTP for password reset
-   * @param {Object} data - { email }
+   * Resend OTP
    */
   async resendOtp(email) {
+
     try {
-      const response = await apiClient.post(API_ENDPOINTS.RESEND_OTP, { email });
-      return response;
+
+      const response = await apiClient.post(
+        API_ENDPOINTS.RESEND_OTP,
+        { email }
+      )
+
+      return response.data
+
     } catch (error) {
-      console.error('Resend OTP error:', error);
-      throw error;
+
+      console.error('Resend OTP error:', error)
+
+      throw error
+
     }
+
   }
-};
+
+}

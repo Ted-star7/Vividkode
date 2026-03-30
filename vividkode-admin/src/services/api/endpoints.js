@@ -8,7 +8,6 @@ export const API_ENDPOINTS = {
     RESEND_OTP: '/api/open/auth/resend-otp',
     
     // Protected endpoints (auth required)
-    LOGOUT: '/api/auth/logout',
     CHANGE_PASSWORD: '/api/auth/change-password',
     VERIFY_OTP: '/api/auth/verify-otp',
     REFRESH_TOKEN: '/api/auth/refresh-token',

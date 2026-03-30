@@ -13,8 +13,8 @@ const apiClient = axios.create({
 // Request interceptor - Add token to header
 apiClient.interceptors.request.use(
   (config) => {
-    const tokenData = cookieStorage.get('auth_token');
-    const token = tokenData?.token;
+    // FIX: Read the token directly as a string, since it was saved as a string
+    const token = cookieStorage.get('auth_token');
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -30,7 +30,6 @@ apiClient.interceptors.response.use(
   (error) => {
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-
       cookieStorage.remove('auth_token');
       cookieStorage.remove('user_data');
 
