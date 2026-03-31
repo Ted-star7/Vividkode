@@ -1,202 +1,158 @@
-import { defineStore } from "pinia";
-import { ref, computed } from "vue";
-import { projectsApi } from "@/services";
+// src/services/api/modules/projects.js
+import apiClient from '../client'
+import { API_ENDPOINTS } from '../endpoints'
+import { useAuthStore } from '@/stores/authStore'
 
-export const useProjectsStore = defineStore("projects", () => {
-  // State
-  const projects = ref([]);
-  const loading = ref(false);
-  const error = ref(null);
+export const projectsApi = {
 
-  // Getters
-  const totalProjects = computed(() => projects.value.length);
-  
-  
-  const publicProjects = computed(() =>
-    projects.value.filter((p) => p.status === "public")
-  );
-  const privateProjects = computed(() =>
-    projects.value.filter((p) => p.status === "private")
-  );
-  
-  // NEW: Filter by 'projectType' instead of the old status
-  const ongoingProjects = computed(() =>
-    projects.value.filter((p) => p.projectType === "ongoing")
-  );
-  const completedProjects = computed(() =>
-    projects.value.filter((p) => p.projectType === "completed")
-  );
-
-  // Helper: Get project by ID
-  function getById(id) {
-    return projects.value.find((p) => p.id === Number(id) || p.id === id);
-  }
-
-  // Fetch all projects
-  async function fetchProjects() {
-    loading.value = true;
-    error.value = null;
-
+  /* =========================
+     GET ALL PROJECTS
+  ========================= */
+  async getAll() {
     try {
-      const response = await projectsApi.getAll();
-
-      if (response.success) {
-        projects.value = response.data || response.projects || [];
-      } else if (Array.isArray(response)) {
-        projects.value = response;
-      } else if (response.data && Array.isArray(response.data)) {
-        projects.value = response.data;
-      } else {
-        projects.value = [];
-      }
-
-      return { success: true, data: projects.value };
-    } catch (err) {
-      error.value = err.message || "Failed to fetch projects";
-      console.error("Fetch projects error:", err);
-      return { success: false, error: error.value };
-    } finally {
-      loading.value = false;
+      const authStore = useAuthStore()
+      const response = await apiClient.get(API_ENDPOINTS.PROJECTS.LIST, {
+        headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}
+      })
+      return response
+    } catch (error) {
+      console.error('Failed to fetch projects:', error)
+      throw error
     }
-  }
+  },
 
-  // Fetch single project
-  async function fetchProjectById(id) {
-    loading.value = true;
-    error.value = null;
-
+ // Stats
+  async getStats() {
     try {
-      const response = await projectsApi.getById(id);
-
-      let projectData;
-      if (response.success) {
-        projectData = response.data || response.project;
-      } else {
-        projectData = response;
+      const authStore = useAuthStore()
+      const response = await apiClient.get(API_ENDPOINTS.PROJECTS.STATS, {
+        headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}
+      })
+      return response
+    } catch (error) {
+      console.error('Failed to fetch projects stats:', error)
+      // return default stats 
+      return {
+        success: false,
+        data: {
+          totalProjects: 0,
+          totalPublicProjects: 0,
+          totalPendingProjects: 0,
+          totalCompletedProjects: 0,
+          totalPrivateProjects: 0
+        },
+        message: error.message
       }
-
-      const index = projects.value.findIndex((p) => p.id === id);
-      if (index !== -1) {
-        projects.value[index] = projectData;
-      }
-
-      return { success: true, data: projectData };
-    } catch (err) {
-      error.value = err.message || "Failed to fetch project";
-      return { success: false, error: error.value };
-    } finally {
-      loading.value = false;
     }
-  }
+  },
 
-  // Create new project
-  async function createProject(projectData, images = []) {
-    loading.value = true;
-    error.value = null;
-
+  /// Get project by ID
+  async getById(id) {
     try {
-      const response = await projectsApi.create(projectData, images);
-
-      let newProject;
-      if (response.success) {
-        newProject = response.data || response.project;
-      } else {
-        newProject = response;
-      }
-
-      projects.value.unshift(newProject);
-      return { success: true, data: newProject };
-    } catch (err) {
-      error.value = err.message || "Failed to create project";
-      return { success: false, error: error.value };
-    } finally {
-      loading.value = false;
+      const authStore = useAuthStore()
+      const response = await apiClient.get(API_ENDPOINTS.PROJECTS.DETAIL(id), {
+        headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}
+      })
+      return response
+    } catch (error) {
+      console.error(`Failed to fetch project ${id}:`, error)
+      throw error
     }
-  }
+  },
 
-  // Update project
-  async function updateProject(id, projectData, images = []) {
-    loading.value = true;
-    error.value = null;
-
+  /* =========================
+     CREATE PROJECT
+  ========================= */
+  async create(projectData, images = []) {
     try {
-      const response = await projectsApi.update(id, projectData, images);
+      const authStore = useAuthStore()
+      const formData = new FormData()
 
-      let updatedProject;
-      if (response.success) {
-        updatedProject = response.data || response.project;
-      } else {
-        updatedProject = response;
-      }
+      Object.entries(projectData).forEach(([key, value]) => {
+        if (value) formData.append(key, value)
+      })
 
-      const index = projects.value.findIndex((p) => p.id === id);
-      if (index !== -1) {
-        projects.value[index] = { ...projects.value[index], ...updatedProject };
-      }
+      images.forEach((image, index) => {
+        if (typeof image === 'string' && image.startsWith('data:image')) {
+          formData.append('images', base64ToBlob(image), `image_${index}.jpg`)
+        } else if (image instanceof File) {
+          formData.append('images', image)
+        }
+      })
 
-      return { success: true, data: updatedProject };
-    } catch (err) {
-      error.value = err.message || "Failed to update project";
-      return { success: false, error: error.value };
-    } finally {
-      loading.value = false;
+      const response = await apiClient.post(API_ENDPOINTS.PROJECTS.CREATE, formData, {
+        headers: {
+          Authorization: authStore.token ? `Bearer ${authStore.token}` : '',
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      return response
+    } catch (error) {
+      console.error('Failed to create project:', error)
+      throw error
     }
-  }
+  },
 
-  // Delete project
-  async function deleteProject(id) {
-    loading.value = true;
-    error.value = null;
-
+  /* =========================
+     UPDATE PROJECT
+  ========================= */
+  async update(id, projectData, images = []) {
     try {
-      await projectsApi.delete(id);
-      projects.value = projects.value.filter((p) => p.id !== id);
-      return { success: true };
-    } catch (err) {
-      error.value = err.message || "Failed to delete project";
-      return { success: false, error: error.value };
-    } finally {
-      loading.value = false;
+      const authStore = useAuthStore()
+      const formData = new FormData()
+
+      Object.entries(projectData).forEach(([key, value]) => {
+        if (value) formData.append(key, value)
+      })
+
+      images.forEach((image, index) => {
+        if (typeof image === 'string' && image.startsWith('data:image')) {
+          formData.append('images', base64ToBlob(image), `image_${index}.jpg`)
+        } else if (image instanceof File) {
+          formData.append('images', image)
+        }
+      })
+
+      const response = await apiClient.put(API_ENDPOINTS.PROJECTS.UPDATE(id), formData, {
+        headers: {
+          Authorization: authStore.token ? `Bearer ${authStore.token}` : '',
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+
+      return response
+    } catch (error) {
+      console.error(`Failed to update project ${id}:`, error)
+      throw error
+    }
+  },
+
+  /* =========================
+     DELETE PROJECT
+  ========================= */
+  async delete(id) {
+    try {
+      const authStore = useAuthStore()
+      const response = await apiClient.delete(API_ENDPOINTS.PROJECTS.DELETE(id), {
+        headers: authStore.token ? { Authorization: `Bearer ${authStore.token}` } : {}
+      })
+      return response
+    } catch (error) {
+      console.error(`Failed to delete project ${id}:`, error)
+      throw error
     }
   }
+}
 
-  // Toggle Visibility (Public/Private)
-  async function toggleVisibility(id) {
-    const project = projects.value.find((p) => p.id === id);
-    if (project) {
-      const newStatus = project.status === "public" ? "private" : "public";
-      return await updateProject(id, { status: newStatus });
-    }
-    return { success: false, error: "Project not found" };
-  }
-
-  // Toggle Project Type (Ongoing/Completed)
-  async function toggleProjectType(id) {
-    const project = projects.value.find((p) => p.id === id);
-    if (project) {
-      const newType = project.projectType === "ongoing" ? "completed" : "ongoing";
-      return await updateProject(id, { projectType: newType });
-    }
-    return { success: false, error: "Project not found" };
-  }
-
-  
-  return {
-    projects,
-    loading,
-    error,
-    totalProjects,
-    publicProjects,
-    privateProjects,
-    ongoingProjects,
-    completedProjects,
-    getById,
-    fetchProjects,
-    fetchProjectById,
-    createProject,
-    updateProject,
-    deleteProject,
-    toggleVisibility,
-    toggleProjectType,
-  };
-});
+/* =========================
+   HELPER: BASE64 TO BLOB
+========================= */
+function base64ToBlob(base64) {
+  const [header, data] = base64.split(';base64,')
+  const contentType = header.split(':')[1]
+  const raw = atob(data)
+  const uInt8Array = new Uint8Array(raw.length)
+  for (let i = 0; i < raw.length; i++) uInt8Array[i] = raw.charCodeAt(i)
+  return new Blob([uInt8Array], { type: contentType })
+}

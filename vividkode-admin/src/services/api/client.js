@@ -1,5 +1,6 @@
+// services/client.js
 import axios from 'axios';
-import { cookieStorage } from '../storage/cookie';
+import { cookieStorage } from "@/services/storage/cookie";
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -12,24 +13,39 @@ const apiClient = axios.create({
 // Request interceptor - Add token to header
 apiClient.interceptors.request.use(
   (config) => {
-    const token = cookieStorage.get('auth_token');
+    // Try to get token from Pinia store first (if available)
+    let token = null;
+    
+    try {
+      // Dynamically import store to avoid circular dependencies
+      // This will be available after Pinia is initialized
+      if (typeof window !== 'undefined' && window.__PINIA__) {
+        const { useAuthStore } = require('@/stores/auth');
+        const authStore = useAuthStore();
+        token = authStore.token;
+      }
+    } catch (e) {
+      // Fallback to cookies if store not available
+      console.log('Store not available, falling back to cookies');
+    }
+    
+    // Fallback to cookies if store didn't have token
+    if (!token) {
+      token = cookieStorage.get('auth_token');
+    }
     
     console.log('📤 Request:', {
       url: config.url,
       method: config.method,
       hasToken: !!token,
-      tokenType: typeof token,
       tokenPreview: token ? `${token.substring(0, 50)}...` : 'none'
     });
     
     if (token) {
-     
       config.headers.Authorization = `Bearer ${token}`;
       console.log('✅ Authorization header set');
-    } else {
-      // console.log('❌ No token found in cookies');
     }
-  
+    
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
       console.log('📎 FormData detected, removed Content-Type header');
@@ -45,15 +61,8 @@ apiClient.interceptors.request.use(
 
 // Response interceptor - Handle responses
 apiClient.interceptors.response.use(
-  (response) => {
-    console.log('📥 Response:', {
-      url: response.config.url,
-      status: response.status,
-      success: response.data?.success
-    });
-    return response.data;
-  },
-  (error) => {
+  (response) => response.data,
+  async (error) => {
     console.error('❌ API Error:', {
       url: error.config?.url,
       status: error.response?.status,
@@ -63,12 +72,21 @@ apiClient.interceptors.response.use(
     
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-      console.log('🔒 401 Unauthorized - Clearing auth data');
-      cookieStorage.remove('auth_token');
-      cookieStorage.remove('user_data');
+      console.log('🔒 401 Unauthorized - Clearing auth');
+      
+      // Clear auth from store and cookies
+      try {
+        const { useAuthStore } = await import('@/stores/auth');
+        const authStore = useAuthStore();
+        authStore.clearAuth();
+      } catch (e) {
+        // Fallback to direct cookie removal
+        cookieStorage.remove('auth_token');
+        cookieStorage.remove('user_data');
+      }
       
       // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         console.log('Redirecting to login...');
         window.location.href = '/login';
       }

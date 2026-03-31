@@ -1,127 +1,86 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
-import { authApi } from "@/services";
+import { ref, computed } from "vue";
 
-export const usePasswordResetStore = defineStore('passwordReset', () => {
+export const useMessagesStore = defineStore("messages", () => {
   // State
-  const email = ref('');
-  const isLoading = ref(false);
-  const error = ref('');
-  const successMessage = ref('');
-  const step = ref('email'); // 'email' or 'reset'
-  
-  // Actions
-  async function requestPasswordReset(userEmail) {
-    isLoading.value = true;
-    error.value = '';
-    successMessage.value = '';
-    
+  const messages = ref([]);
+  const loading = ref(false);
+  const error = ref(null);
+
+  // Getters
+  const totalMessages = computed(() => messages.value.length);
+  const unreadCount = computed(() => messages.value.filter(m => !m.read).length);
+
+  // Fetch messages (mock for now)
+  async function fetchMessages() {
+    loading.value = true;
+    error.value = null;
+
     try {
-      const response = await authApi.forgotPassword(userEmail);
-      
-      if (response.success) {
-        email.value = userEmail;
-        successMessage.value = response.message || 'Reset code sent to your email!';
-        step.value = 'reset'; 
-        return { success: true, data: response };
-      } else {
-        error.value = response.message || 'Failed to send reset code';
-        return { success: false, error: error.value };
-      }
+      // Mock data for now
+      messages.value = [
+        {
+          id: 1,
+          name: "Sarah Johnson",
+          subject: "Website Redesign Feedback",
+          date: "2 hours ago",
+          read: false,
+        },
+        {
+          id: 2,
+          name: "Michael Chen",
+          subject: "Project Timeline Update",
+          date: "Yesterday",
+          read: true,
+        },
+        {
+          id: 3,
+          name: "Emma Davis",
+          subject: "New Feature Request",
+          date: "2 days ago",
+          read: false,
+        },
+        {
+          id: 4,
+          name: "James Wilson",
+          subject: "Budget Approval",
+          date: "3 days ago",
+          read: true,
+        },
+        {
+          id: 5,
+          name: "Lisa Anderson",
+          subject: "Meeting Rescheduled",
+          date: "5 days ago",
+          read: true,
+        },
+      ];
+
+      return { success: true, data: messages.value };
     } catch (err) {
-      error.value = err.message || 'An error occurred. Please try again.';
+      error.value = err.message || "Failed to fetch messages";
+      console.error("Fetch messages error:", err);
       return { success: false, error: error.value };
     } finally {
-      isLoading.value = false;
+      loading.value = false;
     }
   }
-  
-  async function resetPassword(otp, newPassword, confirmPassword) {
-    // Validate passwords match
-    if (newPassword !== confirmPassword) {
-      error.value = 'Passwords do not match';
-      return { success: false, error: 'Passwords do not match' };
-    }
-    
-    // Validate password strength
-    if (newPassword.length < 6) {
-      error.value = 'Password must be at least 6 characters';
-      return { success: false, error: 'Password must be at least 6 characters' };
-    }
-    
-    // Validate OTP
-    if (!otp || otp.length < 4) {
-      error.value = 'Please enter a valid OTP code';
-      return { success: false, error: 'Please enter a valid OTP code' };
-    }
-    
-    isLoading.value = true;
-    error.value = '';
-    
-    try {
-      const response = await authApi.resetPassword({
-        email: email.value,
-        otp: otp,
-        newPassword: newPassword
-      });
-      
-      if (response.success) {
-        successMessage.value = response.message || 'Password reset successful!';
-        return { success: true, data: response };
-      } else {
-        error.value = response.message || 'Failed to reset password';
-        return { success: false, error: error.value };
-      }
-    } catch (err) {
-      error.value = err.message || 'An error occurred. Please try again.';
-      return { success: false, error: error.value };
-    } finally {
-      isLoading.value = false;
+
+  // Mark message as read
+  async function markAsRead(id) {
+    const message = messages.value.find(m => m.id === id);
+    if (message) {
+      message.read = true;
     }
   }
-  
-  async function resendOTP() {
-    isLoading.value = true;
-    error.value = '';
-    
-    try {
-      const response = await authApi.resendOtp(email.value);
-      
-      if (response.success) {
-        successMessage.value = response.message || 'New OTP sent to your email!';
-        return { success: true, data: response };
-      } else {
-        error.value = response.message || 'Failed to resend OTP';
-        return { success: false, error: error.value };
-      }
-    } catch (err) {
-      error.value = err.message || 'Failed to resend OTP';
-      return { success: false, error: error.value };
-    } finally {
-      isLoading.value = false;
-    }
-  }
-  
-  function resetStore() {
-    email.value = '';
-    isLoading.value = false;
-    error.value = '';
-    successMessage.value = '';
-    step.value = 'email';
-  }
-  
+
   return {
-    // State
-    email,
-    isLoading,
+    messages,
+    loading,
     error,
-    successMessage,
-    step,
-    
-    // Actions
-    requestPasswordReset,
-    resetPassword,
-    resendOTP,
-    resetStore
+    totalMessages,
+    unreadCount,
+    fetchMessages,
+    markAsRead,
   };
 });

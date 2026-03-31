@@ -1,6 +1,6 @@
-import apiClient from '../client'
-import { cookieStorage } from '../../storage/cookie'
-import { API_ENDPOINTS } from '../endpoints'
+// services/api/modules/auth.js
+import apiClient from '../../client'; 
+import { API_ENDPOINTS } from '../../endpoints'; 
 
 export const authApi = {
 
@@ -12,41 +12,38 @@ export const authApi = {
       const apiResponse = await apiClient.post(
         API_ENDPOINTS.AUTH.LOGIN_V2,
         credentials
-      )
+      );
 
       if (apiResponse.success) {
-        const payload = apiResponse.data
-
-        // Save token
-        cookieStorage.set('auth_token', payload.token)
-
-        // Save user information
-        cookieStorage.set('user_data', {
-          id: payload.id,
-          role: payload.role,
-          name: payload.name,
-          email: credentials.email
-        })
-
+        const payload = apiResponse.data;
+        
+        // Return the data - let the store handle storage
         return {
           success: true,
-          data: payload,
+          data: {
+            token: payload.token,
+            user: {
+              id: payload.id,
+              role: payload.role,
+              name: payload.name,
+              email: credentials.email
+            }
+          },
           message: apiResponse.message
-        }
+        };
       }
 
       return {
         success: false,
         message: apiResponse.message || 'Login failed'
-      }
+      };
 
     } catch (error) {
-      console.error('Login error:', error)
-
+      console.error('Login error:', error);
       return {
         success: false,
         message: error.message || 'Login failed'
-      }
+      };
     }
   },
 
@@ -54,136 +51,134 @@ export const authApi = {
    * Logout user
    */
   async logout() {
-
-    cookieStorage.remove('auth_token')
-    cookieStorage.remove('user_data')
-
-    return true
-
+    try {
+      // Optional: Call logout endpoint if your API has one
+      // await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
+      return true;
+    } catch (error) {
+      console.error('Logout error:', error);
+      return false;
+    }
   },
 
   /**
    * Get current logged in user
    */
-  getCurrentUser() {
-
-    const token = cookieStorage.get('auth_token')
-    const user = cookieStorage.get('user_data')
-
-    if (!token || !user) {
-      return null
+  async getCurrentUser() {
+    try {
+      // You might need to add ME endpoint to API_ENDPOINTS
+      const response = await apiClient.get('/api/auth/me');
+      if (response.success) {
+        return {
+          success: true,
+          data: response.data
+        };
+      }
+      return {
+        success: false,
+        message: response.message || 'Failed to get user'
+      };
+    } catch (error) {
+      console.error('Get current user error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to get user'
+      };
     }
-
-    return {
-      ...user,
-      token
-    }
-
-  },
-
-  /**
-   * Check if authenticated
-   */
-  isAuthenticated() {
-
-    const token = cookieStorage.get('auth_token')
-
-    return !!token
-
-  },
-
-  /**
-   * Get user role
-   */
-  getUserRole() {
-
-    const user = cookieStorage.get('user_data')
-
-    return user?.role || null
-
-  },
-
-  /**
-   * Get user ID
-   */
-  getUserId() {
-
-    const user = cookieStorage.get('user_data')
-
-    return user?.id || null
-
   },
 
   /**
    * Forgot password
    */
   async forgotPassword(email) {
-
     try {
-
       const response = await apiClient.post(
-        API_ENDPOINTS.FORGOT_PASSWORD,
+        API_ENDPOINTS.AUTH.FORGOT_PASSWORD,
         { email }
-      )
-
-      return response.data
-
+      );
+      return response;
     } catch (error) {
-
-      console.error('Forgot password error:', error)
-
-      throw error
-
+      console.error('Forgot password error:', error);
+      throw error;
     }
-
   },
 
   /**
    * Reset password
    */
   async resetPassword(data) {
-
     try {
-
       const response = await apiClient.post(
-        API_ENDPOINTS.RESET_PASSWORD,
+        API_ENDPOINTS.AUTH.RESET_PASSWORD,
         data
-      )
-
-      return response.data
-
+      );
+      return response;
     } catch (error) {
-
-      console.error('Reset password error:', error)
-
-      throw error
-
+      console.error('Reset password error:', error);
+      throw error;
     }
-
   },
 
   /**
    * Resend OTP
    */
   async resendOtp(email) {
-
     try {
-
       const response = await apiClient.post(
-        API_ENDPOINTS.RESEND_OTP,
+        API_ENDPOINTS.AUTH.RESEND_OTP,
         { email }
-      )
-
-      return response.data
-
+      );
+      return response;
     } catch (error) {
-
-      console.error('Resend OTP error:', error)
-
-      throw error
-
+      console.error('Resend OTP error:', error);
+      throw error;
     }
+  },
 
+  /**
+   * Change password (authenticated)
+   */
+  async changePassword(data) {
+    try {
+      const response = await apiClient.post(
+        API_ENDPOINTS.AUTH.CHANGE_PASSWORD,
+        data
+      );
+      return response;
+    } catch (error) {
+      console.error('Change password error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Verify OTP
+   */
+  async verifyOtp(data) {
+    try {
+      const response = await apiClient.post(
+        API_ENDPOINTS.AUTH.VERIFY_OTP,
+        data
+      );
+      return response;
+    } catch (error) {
+      console.error('Verify OTP error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Refresh token
+   */
+  async refreshToken() {
+    try {
+      const response = await apiClient.post(
+        API_ENDPOINTS.AUTH.REFRESH_TOKEN
+      );
+      return response;
+    } catch (error) {
+      console.error('Refresh token error:', error);
+      throw error;
+    }
   }
-
-}
+};
