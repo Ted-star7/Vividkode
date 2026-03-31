@@ -1,6 +1,6 @@
 // services/client.js
 import axios from 'axios';
-import { cookieStorage } from "@/services/storage/cookie";
+import { localStorageService } from "@/services/storage/local";
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -13,26 +13,7 @@ const apiClient = axios.create({
 // Request interceptor - Add token to header
 apiClient.interceptors.request.use(
   (config) => {
-    // Try to get token from Pinia store first (if available)
-    let token = null;
-    
-    try {
-      // Dynamically import store to avoid circular dependencies
-      // This will be available after Pinia is initialized
-      if (typeof window !== 'undefined' && window.__PINIA__) {
-        const { useAuthStore } = require('@/stores/auth');
-        const authStore = useAuthStore();
-        token = authStore.token;
-      }
-    } catch (e) {
-      // Fallback to cookies if store not available
-      console.log('Store not available, falling back to cookies');
-    }
-    
-    // Fallback to cookies if store didn't have token
-    if (!token) {
-      token = cookieStorage.get('auth_token');
-    }
+    const token = localStorageService.get('auth_token');
     
     console.log('📤 Request:', {
       url: config.url,
@@ -72,23 +53,37 @@ apiClient.interceptors.response.use(
     
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-      console.log('🔒 401 Unauthorized - Clearing auth');
-      
-      // Clear auth from store and cookies
-      try {
-        const { useAuthStore } = await import('@/stores/auth');
-        const authStore = useAuthStore();
-        authStore.clearAuth();
-      } catch (e) {
-        // Fallback to direct cookie removal
-        cookieStorage.remove('auth_token');
-        cookieStorage.remove('user_data');
-      }
-      
-      // Redirect to login if not already there
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        console.log('Redirecting to login...');
-        window.location.href = '/login';
+      const url = String(error.config?.url || '');
+      const isAuthSessionEndpoint =
+        url.includes('/auth/me') ||
+        url.includes('/auth/refresh') ||
+        url.includes('/auth/session');
+
+      // Only wipe auth for endpoints that *prove* the session is invalid.
+      // A 401 from a business endpoint could be permissions/misconfig and should not log users out.
+      if (isAuthSessionEndpoint) {
+        console.log('🔒 401 on auth session endpoint - clearing auth');
+
+        try {
+          const { useAuthStore } = await import('@/stores/auth');
+          const authStore = useAuthStore();
+          authStore.clearAuth();
+        } catch {
+          localStorageService.remove('auth_token');
+          localStorageService.remove('user_data');
+        }
+
+        // Soft-navigate to login (avoid full reload so Network/Console stay visible)
+        try {
+          const { default: router } = await import('@/router');
+          if (router?.currentRoute?.value?.name !== 'login') {
+            router.push({ name: 'login' }).catch(() => {});
+          }
+        } catch {
+          // ignore
+        }
+      } else {
+        console.warn('⚠️ 401 from non-auth endpoint; not logging out automatically:', url);
       }
     }
     

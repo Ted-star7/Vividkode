@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { authApi } from '@/services/api/modules/auth';
-import { cookieStorage } from "@/services/storage/cookie";
+import { localStorageService } from "@/services/storage/local";
 
 export const useAuthStore = defineStore('auth', () => {
 
@@ -37,15 +37,15 @@ export const useAuthStore = defineStore('auth', () => {
   ========================= */
 
   /**
-   * Sync current state to cookies (persistence)
+   * Sync current state to localStorage (persistence)
    */
-  function _syncToCookies() {
+  function _syncToLocalStorage() {
     if (token.value && user.value) {
-      cookieStorage.set('auth_token', token.value);
-      cookieStorage.set('user_data', user.value);
+      localStorageService.set('auth_token', token.value);
+      localStorageService.set('user_data', user.value);
     } else {
-      cookieStorage.remove('auth_token');
-      cookieStorage.remove('user_data');
+      localStorageService.remove('auth_token');
+      localStorageService.remove('user_data');
     }
   }
 
@@ -65,7 +65,13 @@ export const useAuthStore = defineStore('auth', () => {
     if (!jwt) return false;
 
     try {
-      const payload = JSON.parse(atob(jwt.split('.')[1]));
+      const base64Url = jwt.split('.')[1];
+      if (!base64Url) return false;
+
+      // JWT payload is base64url encoded (not plain base64)
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const payload = JSON.parse(atob(padded));
       const exp = payload.exp;
 
       if (!exp) return true;
@@ -84,23 +90,23 @@ export const useAuthStore = defineStore('auth', () => {
   ========================= */
 
   /**
-   * Initialize auth from cookies (call on app startup)
+   * Initialize auth from localStorage (call on app startup)
    */
   function init() {
     if (initialized.value) return;
 
-    const storedToken = cookieStorage.get('auth_token');
-    const storedUser = cookieStorage.get('user_data');
+    const storedToken = localStorageService.get('auth_token');
+    const storedUser = localStorageService.get('user_data');
 
     if (storedToken && storedUser && validateToken(storedToken)) {
       token.value = storedToken;
       user.value = storedUser;
-      console.log('✅ Auth initialized from cookies');
+      console.log('✅ Auth initialized from localStorage');
     } else {
       // Clear invalid data
       if (storedToken || storedUser) {
-        cookieStorage.remove('auth_token');
-        cookieStorage.remove('user_data');
+        localStorageService.remove('auth_token');
+        localStorageService.remove('user_data');
       }
       console.log('⚠️ No valid auth session');
     }
@@ -128,8 +134,8 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = newToken;
       user.value = userData;
       
-      // Sync to cookies
-      _syncToCookies();
+      // Sync to localStorage
+      _syncToLocalStorage();
 
       return {
         success: true,
@@ -155,9 +161,9 @@ export const useAuthStore = defineStore('auth', () => {
     // Clear state first
     _clearState();
     
-    // Clear cookies
-    cookieStorage.remove('auth_token');
-    cookieStorage.remove('user_data');
+    // Clear localStorage
+    localStorageService.remove('auth_token');
+    localStorageService.remove('user_data');
     
     // Call logout API (optional)
     await authApi.logout().catch(console.error);
@@ -170,8 +176,8 @@ export const useAuthStore = defineStore('auth', () => {
    */
   function clearAuth() {
     _clearState();
-    cookieStorage.remove('auth_token');
-    cookieStorage.remove('user_data');
+    localStorageService.remove('auth_token');
+    localStorageService.remove('user_data');
     console.log('🧹 Auth cleared');
   }
 
@@ -185,7 +191,7 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await authApi.getCurrentUser();
       if (response.success && response.data) {
         user.value = response.data;
-        _syncToCookies();
+        _syncToLocalStorage();
         return response.data;
       }
       return null;

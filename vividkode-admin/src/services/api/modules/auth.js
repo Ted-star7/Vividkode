@@ -1,6 +1,6 @@
 // services/api/modules/auth.js
-import apiClient from '../../client'; 
-import { API_ENDPOINTS } from '../../endpoints'; 
+import apiClient from '@/services/api/client';
+import { API_ENDPOINTS } from '@/services/api/endpoints';
 
 export const authApi = {
 
@@ -26,7 +26,8 @@ export const authApi = {
               id: payload.id,
               role: payload.role,
               name: payload.name,
-              email: credentials.email
+              // Some backends don't echo email; keep it if we have it
+              ...(credentials?.email ? { email: credentials.email } : {})
             }
           },
           message: apiResponse.message
