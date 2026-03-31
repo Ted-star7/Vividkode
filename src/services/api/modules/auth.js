@@ -181,5 +181,22 @@ export const authApi = {
       console.error('Refresh token error:', error);
       throw error;
     }
+  },
+
+  /**
+   * Backward-compatible aliases for older store names.
+   */
+  async requestPasswordReset(payload) {
+    const email = typeof payload === 'string' ? payload : payload?.email;
+    return this.forgotPassword(email);
+  },
+
+  async resendOTP(payload) {
+    const email = typeof payload === 'string' ? payload : payload?.email;
+    return this.resendOtp(email);
+  },
+
+  async verifyOTP(data) {
+    return this.verifyOtp(data);
   }
 };

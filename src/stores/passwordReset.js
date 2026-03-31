@@ -40,15 +40,18 @@ export const usePasswordResetStore = defineStore("passwordReset", () => {
 
     try {
 
-      const response = await authApi.requestPasswordReset({
-        email: userEmail
-      });
+      const normalizedEmail = String(userEmail || "").trim().toLowerCase();
+      if (!normalizedEmail) {
+        throw new Error("Email is required");
+      }
+
+      const response = await authApi.forgotPassword(normalizedEmail);
 
       if (!response.success) {
         throw new Error(response.message || "Failed to send reset code");
       }
 
-      email.value = userEmail;
+      email.value = normalizedEmail;
       step.value = "reset";
 
       successMessage.value = response.message || "Reset code sent to your email.";
@@ -87,26 +90,11 @@ export const usePasswordResetStore = defineStore("passwordReset", () => {
         throw new Error("Passwords do not match");
       }
 
-      /**
-       * Step 1: Verify OTP
-       */
-      const otpResponse = await authApi.verifyOTP({
-        email: email.value,
-        otp: otp
-      });
-
-      if (!otpResponse.success) {
-        throw new Error(otpResponse.message || "Invalid OTP");
-      }
-
-
-      /**
-       * Step 2: Change password
-       */
-      const passwordResponse = await authApi.changePassword({
+      const passwordResponse = await authApi.resetPassword({
         email: email.value,
         otp: otp,
-        new_password: newPassword
+        new_password: newPassword,
+        confirm_password: confirmPassword
       });
 
       if (!passwordResponse.success) {
@@ -146,9 +134,7 @@ export const usePasswordResetStore = defineStore("passwordReset", () => {
 
     try {
 
-      const response = await authApi.requestPasswordReset({
-        email: email.value
-      });
+      const response = await authApi.resendOtp(email.value);
 
       if (!response.success) {
         throw new Error(response.message || "Failed to resend OTP");

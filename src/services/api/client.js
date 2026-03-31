@@ -2,8 +2,19 @@
 import axios from 'axios';
 import { localStorageService } from "@/services/storage/local";
 
+function resolveApiBaseUrl() {
+  const rawBaseUrl = String(import.meta.env.VITE_API_URL || '').trim();
+  if (!rawBaseUrl) return '';
+
+  // Endpoints already include `/api/...`; avoid accidental `/api/api/...`.
+  const noTrailingSlash = rawBaseUrl.replace(/\/+$/, '');
+  return noTrailingSlash.endsWith('/api')
+    ? noTrailingSlash.slice(0, -4)
+    : noTrailingSlash;
+}
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: resolveApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
