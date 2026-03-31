@@ -59,7 +59,8 @@
         <div
           v-for="(stat, i) in statsCards"
           :key="stat.label"
-          class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+          class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
+          @click="router.push(stat.route)"
         >
           <div class="flex items-start justify-between mb-4">
             <div
@@ -291,7 +292,7 @@
 
 <script setup>
 import { computed, ref, onMounted } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { Bar, Doughnut } from "vue-chartjs";
 import {
   Chart as ChartJS,
@@ -321,6 +322,7 @@ ChartJS.register(
 const auth = useAuthStore();
 const projectsStore = useProjectsStore();
 const messagesStore = useMessagesStore();
+const router = useRouter();
 
 // Loading state
 const loading = ref(true);
@@ -353,6 +355,7 @@ const statsCards = computed(() => [
     changeBg: "bg-navy-50 text-navy-600",
     barColor: "bg-navy-700",
     barWidth: `${Math.min((safeStats.value.totalProjects / 20) * 100, 100)}%`,
+    route: "/dashboard/projects",
   },
   {
     label: "Public Projects",
@@ -363,6 +366,7 @@ const statsCards = computed(() => [
     changeBg: "bg-green-50 text-green-700",
     barColor: "bg-green-500",
     barWidth: `${Math.min((safeStats.value.totalPublicProjects / 20) * 100, 100)}%`,
+    route: "/dashboard/projects",
   },
   {
     label: "Private Projects",
@@ -373,6 +377,7 @@ const statsCards = computed(() => [
     changeBg: "bg-gray-50 text-gray-600",
     barColor: "bg-gray-500",
     barWidth: `${Math.min((safeStats.value.totalPrivateProjects / 20) * 100, 100)}%`,
+    route: "/dashboard/projects",
   },
   {
     label: "Pending Projects",
@@ -383,6 +388,7 @@ const statsCards = computed(() => [
     changeBg: "bg-yellow-50 text-yellow-700",
     barColor: "bg-yellow-500",
     barWidth: `${Math.min((safeStats.value.totalPendingProjects / 20) * 100, 100)}%`,
+    route: "/dashboard/projects",
   },
   {
     label: "Completed Projects",
@@ -393,6 +399,7 @@ const statsCards = computed(() => [
     changeBg: "bg-emerald-50 text-emerald-700",
     barColor: "bg-emerald-500",
     barWidth: `${Math.min((safeStats.value.totalCompletedProjects / 20) * 100, 100)}%`,
+    route: "/dashboard/projects",
   },
 ]);
 
@@ -550,34 +557,6 @@ const activities = [
     bg: "bg-emerald-100 text-emerald-700",
     text: 'Project "LogiChain Supply Management" marked as completed',
     time: "2 hours ago",
-  },
-  {
-    id: 2,
-    icon: "📩",
-    bg: "bg-gold-100 text-gold-700",
-    text: "New message received from Sarah Johnson — Website Redesign",
-    time: "4 hours ago",
-  },
-  {
-    id: 3,
-    icon: "👤",
-    bg: "bg-navy-100 text-navy-700",
-    text: "New lead added: Priya Sharma from FinTech IN",
-    time: "6 hours ago",
-  },
-  {
-    id: 4,
-    icon: "🚀",
-    bg: "bg-purple-100 text-purple-700",
-    text: 'Project "HealthTrack Patient Portal" created and added to pipeline',
-    time: "Yesterday",
-  },
-  {
-    id: 5,
-    icon: "✏️",
-    bg: "bg-blue-100 text-blue-700",
-    text: 'Company "About Us" content section updated',
-    time: "2 days ago",
   },
 ];
 

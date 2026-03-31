@@ -13,6 +13,46 @@ function normalizeId(id) {
   return String(id)
 }
 
+function normalizeImageUrl(raw) {
+  if (!raw) return null
+  if (typeof raw === 'object') {
+    raw = raw.url || raw.path || raw.src || raw.image || null
+  }
+  if (!raw || typeof raw !== 'string') return null
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:image')) return raw
+
+  const base = String(import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '')
+  if (!base) return raw
+  const root = base.endsWith('/api') ? base.slice(0, -4) : base
+  return `${root}/${raw.replace(/^\/+/, '')}`
+}
+
+function normalizeProject(project) {
+  const rawImages = Array.isArray(project?.images)
+    ? project.images
+    : Array.isArray(project?.projectImages)
+      ? project.projectImages
+      : Array.isArray(project?.imageUrls)
+        ? project.imageUrls
+      : project?.thumbnail
+        ? [project.thumbnail]
+        : project?.image
+          ? [project.image]
+          : []
+
+  return {
+    ...project,
+    id: project?.id ?? project?._id ?? project?.projectId,
+    title: project?.title ?? project?.projectTitle ?? '',
+    clientName: project?.clientName ?? project?.client_name ?? '',
+    projectDescription: project?.projectDescription ?? project?.description ?? '',
+    projectType: project?.projectType ?? project?.type ?? 'ongoing',
+    projectLink: project?.projectLink ?? project?.link ?? '',
+    techStack: Array.isArray(project?.techStack) ? project.techStack.join(', ') : (project?.techStack ?? ''),
+    images: rawImages.map(normalizeImageUrl).filter(Boolean),
+  }
+}
+
 export const useProjectsStore = defineStore('projects', () => {
   const projects = ref([])
   const stats = ref(null)
@@ -32,7 +72,7 @@ export const useProjectsStore = defineStore('projects', () => {
     try {
       const response = await projectsApi.getAll()
       const next = toArray(response?.data ?? response)
-      projects.value = next
+      projects.value = next.map(normalizeProject)
       return response
     } catch (e) {
       error.value = e?.message || 'Failed to fetch projects'

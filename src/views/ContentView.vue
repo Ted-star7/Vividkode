@@ -5,6 +5,21 @@
       <p class="text-sm text-gray-400 mt-0.5">Manage company content for your public website</p>
     </div>
 
+    <div class="card p-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div>
+        <label class="label">Vision/Mission ID</label>
+        <input v-model="visionMissionLookupId" class="input-field" placeholder="Enter id to fetch" />
+      </div>
+      <div>
+        <label class="label">Testimonial ID</label>
+        <input v-model="testimonialLookupId" class="input-field" placeholder="Enter id to fetch" />
+      </div>
+      <div class="flex items-end gap-2">
+        <button class="btn-outline" @click="fetchVisionMissionById">Fetch Vision/Mission</button>
+        <button class="btn-outline" @click="fetchTestimonialById">Fetch Testimonial</button>
+      </div>
+    </div>
+
     <!-- Tabs -->
     <div class="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 mb-6 w-fit">
       <button v-for="tab in tabs" :key="tab.id"
@@ -121,6 +136,10 @@
           <span>✓</span> Saved successfully
         </div>
       </div>
+
+      <div v-else-if="activeTab === 'testimonials'" key="testimonials" class="animate-fade-in">
+        <TestimonialsManager />
+      </div>
     </Transition>
 
     <!-- Preview panel -->
@@ -137,8 +156,9 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useContentStore } from '@/stores/content'
+import TestimonialsManager from '@/components/content/TestimonialsManager.vue'
 
 const contentStore = useContentStore()
 const activeTab = ref('mission')
@@ -147,18 +167,22 @@ const savedSection = ref('')
 const editMission = ref(contentStore.content.mission)
 const editVision = ref(contentStore.content.vision)
 const editAbout = ref(contentStore.content.about)
+const visionMissionLookupId = ref('')
+const testimonialLookupId = ref('')
 
 const tabs = [
   { id: 'mission', label: 'Mission', icon: '🎯' },
   { id: 'vision', label: 'Vision', icon: '🔭' },
   { id: 'about', label: 'About Us', icon: '🏢' },
   { id: 'services', label: 'Services', icon: '⚙️' },
+  { id: 'testimonials', label: 'Testimonials', icon: '💬' },
 ]
 
 const previewText = computed(() => {
   if (activeTab.value === 'mission') return editMission.value
   if (activeTab.value === 'vision') return editVision.value
   if (activeTab.value === 'about') return editAbout.value
+  if (activeTab.value === 'testimonials') return 'Manage testimonial entries and ratings.'
   return contentStore.content.services.map(s => `${s.icon} ${s.title}\n${s.description}`).join('\n\n')
 })
 
@@ -173,6 +197,31 @@ async function saveServices() {
   savedSection.value = 'services'
   setTimeout(() => { savedSection.value = '' }, 3000)
 }
+
+async function fetchVisionMissionById() {
+  if (!visionMissionLookupId.value) return
+  await contentStore.fetchVisionMission(visionMissionLookupId.value)
+  editMission.value = contentStore.content.mission
+  editVision.value = contentStore.content.vision
+}
+
+async function fetchTestimonialById() {
+  if (!testimonialLookupId.value) return
+  await contentStore.getTestimonial(testimonialLookupId.value)
+}
+
+onMounted(async () => {
+  try {
+    await Promise.all([
+      contentStore.fetchVisionMissionList(),
+      contentStore.fetchTestimonials(),
+    ])
+    editMission.value = contentStore.content.mission
+    editVision.value = contentStore.content.vision
+  } catch {
+    // Keep existing local defaults if API is unavailable.
+  }
+})
 </script>
 
 <style scoped>

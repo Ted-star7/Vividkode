@@ -20,6 +20,20 @@ export const API_ENDPOINTS = {
     DELETE: (id) => `/api/projects/delete/${id}`,
     STATS: '/api/projects/stats'
   },
+  TESTIMONIALS: {
+    LIST: '/api/testimonials',
+    CREATE: '/api/testimonials',
+    DETAIL: (id) => `/api/testimonials/${id}`,
+    UPDATE: (id) => `/api/testimonials/${id}`,
+    DELETE: (id) => `/api/testimonials/${id}`,
+  },
+  VISION_MISSION: {
+    LIST: '/api/vission-mission',
+    CREATE: '/api/vission-mission',
+    DETAIL: (id) => `/api/vission-mission/${id}`,
+    UPDATE: (id) => `/api/vission-mission/${id}`,
+    DELETE: (id) => `/api/vission-mission/${id}`,
+  },
   USERS: {
     LIST: '/api/users',
     DETAIL: (id) => `/api/users/${id}`,
