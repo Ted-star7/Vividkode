@@ -85,7 +85,19 @@ export const useProjectsStore = defineStore('projects', () => {
   async function fetchStats() {
     try {
       const response = await projectsApi.getStats()
-      stats.value = response?.data ?? response?.data?.data ?? response?.data?.stats ?? response?.data ?? response
+      const defaults = {
+        totalProjects: 0,
+        totalPublicProjects: 0,
+        totalPendingProjects: 0,
+        totalCompletedProjects: 0,
+        totalPrivateProjects: 0,
+      }
+      let s = null
+      if (response && typeof response === 'object') {
+        if (typeof response.totalProjects === 'number') s = response
+        else if (response.data && typeof response.data.totalProjects === 'number') s = response.data
+      }
+      stats.value = s || defaults
       return response
     } catch (e) {
       stats.value = {
@@ -158,15 +170,19 @@ export const useProjectsStore = defineStore('projects', () => {
   }
 
   function getMonthlyActivityData(year = new Date().getFullYear()) {
-    const months = Array.from({ length: 12 }, () => 0)
+    const completed = Array.from({ length: 12 }, () => 0)
+    const started = Array.from({ length: 12 }, () => 0)
     for (const p of projects.value) {
       const raw = p?.createdAt || p?.created_at || p?.created || p?.date || p?.updatedAt || p?.updated_at
       const d = raw ? new Date(raw) : null
       if (!d || Number.isNaN(d.getTime())) continue
       if (d.getFullYear() !== year) continue
-      months[d.getMonth()] += 1
+      const m = d.getMonth()
+      const pt = String(p?.projectType || '').toLowerCase()
+      if (pt === 'completed') completed[m] += 1
+      else started[m] += 1
     }
-    return months
+    return { completed, started }
   }
 
   return {

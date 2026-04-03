@@ -1,78 +1,130 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import { consultationsApi } from "@/services/api/modules/consultations";
 
-const INITIAL_MESSAGES = [
-  {
-    id: 1,
-    name: "James Mwangi",
-    email: "jmwangi@jsmart.co.ke",
-    subject: "Website Redesign for Jsmart",
-    message:
-      "Hello, we are planning a full redesign of the Jsmart website. The site will have around 20 pages including services, blog, and contact sections. We would like a modern UI and CMS integration. Can we schedule a call to discuss?",
-    date: "2024-04-12",
-    read: false,
-    replied: false,
-    status: "unread",
-  },
-  {
-    id: 2,
-    name: "Grace Wanjiku",
-    email: "gwanjiku@hopebridge.org",
-    subject: "NGO Data Analytics Dashboard",
-    message:
-      "Greetings. At HopeBridge NGO we would like to build a dashboard to track donor contributions, volunteer activity, and program impact reports. We are looking for data visualization and reporting features.",
-    date: "2024-04-11",
-    read: true,
-    replied: true,
-    status: "replied",
-  },
-  {
-    id: 3,
-    name: "David Otieno",
-    email: "dotieno@jsmart.co.ke",
-    subject: "eBook Design and Publishing Support",
-    message:
-      "Hi, I am preparing an entrepreneurship and leadership eBook and would like help with formatting, design, and publishing. Ideally the final version should be ready for Kindle and PDF distribution.",
-    date: "2024-04-10",
-    read: true,
-    replied: false,
-    status: "read",
-  },
-];
+const UI_KEY = "vk_consultation_ui_v1";
+
+function loadUiMap() {
+  try {
+    const raw = sessionStorage.getItem(UI_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveUiMap(map) {
+  try {
+    sessionStorage.setItem(UI_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore */
+  }
+}
+
+function toArray(data) {
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+function normalizeConsultation(raw, uiById) {
+  const id = String(raw?.id ?? "");
+  const ui = uiById[id] || {};
+  const name = raw?.fullName || "Unknown";
+  const subject = raw?.service || "Consultation";
+  const dateLine = [raw?.date, raw?.time].filter(Boolean).join(" · ");
+  const read = Boolean(ui.read);
+  const replied = Boolean(ui.replied);
+  let status = "unread";
+  if (replied) status = "replied";
+  else if (read) status = "read";
+
+  return {
+    id: raw.id,
+    name,
+    email: raw?.email || "",
+    subject,
+    message: raw?.message || "",
+    date: dateLine || raw?.date || "",
+    companyName: raw?.companyName || "",
+    service: raw?.service || "",
+    time: raw?.time || "",
+    read,
+    replied,
+    status,
+    _raw: raw,
+  };
+}
 
 export const useMessagesStore = defineStore("messages", () => {
-  const messages = ref([...INITIAL_MESSAGES]);
+  const messages = ref([]);
+  const loading = ref(false);
+  const error = ref("");
 
   const unreadCount = computed(
-    () => messages.value.filter((m) => !m.read).length,
+    () => messages.value.filter((m) => !m.read && !m.replied).length,
   );
   const totalMessages = computed(() => messages.value.length);
 
-  function markRead(id) {
-    const msg = messages.value.find((m) => m.id === id);
-    if (msg) {
-      msg.read = true;
-      msg.status = msg.replied ? "replied" : "read";
+  function mergeUiState(list) {
+    const uiById = loadUiMap();
+    messages.value = list.map((raw) => normalizeConsultation(raw, uiById));
+  }
+
+  async function fetchConsultations() {
+    loading.value = true;
+    error.value = "";
+    try {
+      const response = await consultationsApi.list();
+      const list = toArray(response?.data ?? response);
+      mergeUiState(list);
+      return response;
+    } catch (e) {
+      error.value = e?.message || "Failed to load consultations";
+      throw e;
+    } finally {
+      loading.value = false;
     }
+  }
+
+  function persistUi(id, patch) {
+    const map = loadUiMap();
+    map[String(id)] = { ...map[String(id)], ...patch };
+    saveUiMap(map);
+  }
+
+  function markRead(id) {
+    const msg = messages.value.find((m) => String(m.id) === String(id));
+    if (!msg) return;
+    msg.read = true;
+    msg.replied = msg.replied || false;
+    msg.status = msg.replied ? "replied" : "read";
+    persistUi(id, { read: true });
   }
 
   function markReplied(id) {
-    const msg = messages.value.find((m) => m.id === id);
-    if (msg) {
-      msg.replied = true;
-      msg.read = true;
-      msg.status = "replied";
-    }
+    const msg = messages.value.find((m) => String(m.id) === String(id));
+    if (!msg) return;
+    msg.replied = true;
+    msg.read = true;
+    msg.status = "replied";
+    persistUi(id, { read: true, replied: true });
   }
 
-  function deleteMessage(id) {
-    messages.value = messages.value.filter((m) => m.id !== id);
+  async function deleteMessage(id) {
+    await consultationsApi.delete(id);
+    messages.value = messages.value.filter((m) => String(m.id) !== String(id));
+    const map = loadUiMap();
+    delete map[String(id)];
+    saveUiMap(map);
   }
 
   return {
     messages,
+    loading,
+    error,
     unreadCount,
     totalMessages,
+    fetchConsultations,
     markRead,
     markReplied,
     deleteMessage,

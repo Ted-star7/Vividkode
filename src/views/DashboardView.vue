@@ -110,12 +110,12 @@
               </p>
             </div>
             <select
-              v-model="selectedYear"
+              v-model.number="selectedYear"
               class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-navy-600 focus:outline-none focus:ring-2 focus:ring-navy-900/10"
             >
-              <option value="2024">2024</option>
-              <option value="2025">2025</option>
-              <option value="2026">2026</option>
+              <option :value="2024">2024</option>
+              <option :value="2025">2025</option>
+              <option :value="2026">2026</option>
             </select>
           </div>
           <Bar :data="barData" :options="barOptions" class="max-h-56" />
@@ -405,7 +405,9 @@ const statsCards = computed(() => [
 
 // Bar chart data - using real project data
 const barData = computed(() => {
-  const monthlyData = projectsStore.getMonthlyActivityData();
+  const monthlyData = projectsStore.getMonthlyActivityData(
+    Number(selectedYear.value),
+  );
   return {
     labels: [
       "Jan",
@@ -567,14 +569,8 @@ onMounted(async () => {
     const promises = [
       projectsStore.fetchStats(),
       projectsStore.fetchProjects(),
+      messagesStore.fetchConsultations(),
     ];
-
-    // Only call fetchMessages if the store exists and has the function
-    // if (messagesStore && typeof messagesStore.fetchMessages === "function") {
-    //   promises.push(messagesStore.fetchMessages());
-    // } else {
-    //   console.warn("Messages store not properly initialized");
-    // }
 
     const results = await Promise.allSettled(promises);
 

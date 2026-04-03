@@ -53,12 +53,52 @@
       <p class="text-gray-400 mt-2">Loading projects...</p>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <template v-if="!projectsStore.loading">
       <div
-        v-for="project in filteredProjects"
+        v-if="filteredProjects.length > 0"
+        class="flex flex-wrap items-center justify-between gap-3 mb-4 text-sm text-gray-600"
+      >
+        <div class="flex items-center gap-2">
+          <span>Rows per page</span>
+          <select
+            v-model.number="pageSize"
+            class="px-2 py-1 border border-gray-200 rounded-lg text-sm"
+          >
+            <option :value="6">6</option>
+            <option :value="9">9</option>
+            <option :value="12">12</option>
+            <option :value="24">24</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            :disabled="currentPage <= 1"
+            @click="currentPage--"
+          >
+            Previous
+          </button>
+          <span class="text-xs text-gray-500"
+            >Page {{ currentPage }} of {{ totalPages }} ({{ filteredProjects.length }} total)</span
+          >
+          <button
+            type="button"
+            class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            :disabled="currentPage >= totalPages"
+            @click="currentPage++"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div
+        v-for="project in paginatedProjects"
         :key="project.id"
         class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all cursor-pointer overflow-hidden flex flex-col"
-        @click="$router.push(`/projects/${project.id}`)"
+        @click="$router.push({ name: 'project-detail', params: { id: project.id } })"
       >
         <div
           v-if="project.images && project.images.length > 0"
@@ -149,7 +189,8 @@
         <div class="text-4xl mb-3">📁</div>
         <p class="font-medium">No projects found</p>
       </div>
-    </div>
+      </div>
+    </template>
 
     <Teleport to="body">
       <div
@@ -358,7 +399,7 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted } from "vue";
+import { ref, computed, reactive, onMounted, watch } from "vue";
 import { useProjectsStore } from "@/stores/projects";
 
 const projectsStore = useProjectsStore();
@@ -370,6 +411,8 @@ const isEditing = ref(false);
 const deleteTarget = ref(null);
 const techStackInput = ref("");
 const selectedImages = ref([]);
+const currentPage = ref(1);
+const pageSize = ref(9);
 
 const form = reactive({
   title: "",
@@ -393,6 +436,24 @@ const filteredProjects = computed(() => {
       !filterCategory.value || p.category === filterCategory.value;
     return matchSearch && matchType && matchCat;
   });
+});
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredProjects.value.length / pageSize.value)),
+);
+
+const paginatedProjects = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value;
+  return filteredProjects.value.slice(start, start + pageSize.value);
+});
+
+watch([filteredProjects, pageSize], () => {
+  if (currentPage.value > totalPages.value) currentPage.value = totalPages.value;
+  if (currentPage.value < 1) currentPage.value = 1;
+});
+
+watch([search, filterProjectType, filterCategory], () => {
+  currentPage.value = 1;
 });
 
 function getCategoryGradient(cat) {

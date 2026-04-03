@@ -5,6 +5,7 @@
       <div>
         <h1 class="page-title">Clients & Leads</h1>
         <p class="text-sm text-gray-400 mt-0.5">{{ clientsStore.totalClients }} total · {{ clientsStore.activeClients }} converted</p>
+        <p v-if="clientsStore.error" class="text-xs text-red-500 mt-1">{{ clientsStore.error }}</p>
       </div>
       <button @click="openCreate" class="btn-primary">＋ Add Client</button>
     </div>
@@ -21,7 +22,7 @@
       <div class="card p-4 flex items-center gap-3">
         <div class="w-10 h-10 bg-navy-50 rounded-xl flex items-center justify-center text-xl">📞</div>
         <div>
-          <div class="font-display text-2xl font-bold text-navy-900">{{ contactedCount }}</div>
+          <div class="font-display text-2xl font-bold text-navy-900">{{ clientsStore.statusCounts.contactedCount }}</div>
           <div class="text-xs text-gray-400">Contacted</div>
         </div>
       </div>
@@ -50,7 +51,8 @@
     </div>
 
     <!-- Table -->
-    <div class="card overflow-hidden">
+    <div v-if="clientsStore.loading" class="card p-12 text-center text-gray-400 text-sm">Loading clients…</div>
+    <div v-else class="card overflow-hidden">
       <table class="w-full">
         <thead>
           <tr>
@@ -68,7 +70,7 @@
               <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                   :style="{ background: getColor(client.name) }">
-                  {{ client.name.charAt(0) }}
+                  {{ (client.name || '?').charAt(0) }}
                 </div>
                 <div>
                   <div class="font-medium text-navy-800 text-sm">{{ client.name }}</div>
@@ -82,7 +84,13 @@
               <div class="text-xs text-gray-400">{{ client.phone }}</div>
             </td>
             <td class="table-cell lg:table-cell">
-              <span class="font-mono text-sm font-semibold text-navy-800">${{ client.value?.toLocaleString() }}</span>
+              <span class="font-mono text-sm font-semibold text-navy-800">{{
+                client.estPrice != null && client.estPrice !== ''
+                  ? client.estPrice
+                  : client.value != null && client.value !== 0
+                    ? client.value.toLocaleString()
+                    : '—'
+              }}</span>
             </td>
             <td class="table-cell">
               <select
@@ -217,7 +225,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useClientsStore } from '@/stores/clients'
 
 const clientsStore = useClientsStore()
@@ -235,8 +243,6 @@ const statusFilters = [
   { label: 'Contacted', value: 'contacted' },
   { label: 'Converted', value: 'converted' },
 ]
-
-const contactedCount = computed(() => clientsStore.clients.filter(c => c.status === 'contacted').length)
 
 const filteredClients = computed(() => {
   return clientsStore.clients.filter(c => {
@@ -277,6 +283,10 @@ async function doDelete() {
   await clientsStore.deleteClient(deleteTarget.value.id)
   deleteTarget.value = null
 }
+
+onMounted(() => {
+  clientsStore.fetchClients().catch(() => {})
+})
 </script>
 
 <style scoped>

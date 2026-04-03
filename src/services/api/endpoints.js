@@ -21,14 +21,14 @@ export const API_ENDPOINTS = {
     STATS: '/api/projects/stats'
   },
   TESTIMONIALS: {
-    LIST: '/api/testimonials',
+    LIST: '/api/open/testimonials',
     CREATE: '/api/testimonials',
     DETAIL: (id) => `/api/testimonials/${id}`,
     UPDATE: (id) => `/api/testimonials/${id}`,
     DELETE: (id) => `/api/testimonials/${id}`,
   },
   VISION_MISSION: {
-    LIST: '/api/vission-mission',
+    LIST: '/api/open/vission-mission',
     CREATE: '/api/vission-mission',
     DETAIL: (id) => `/api/vission-mission/${id}`,
     UPDATE: (id) => `/api/vission-mission/${id}`,
@@ -40,5 +40,20 @@ export const API_ENDPOINTS = {
     UPDATE: (id) => `/api/users/${id}`,
     DELETE: (id) => `/api/users/${id}`,
 
-  }
+  },
+  CONSULTATIONS: {
+    LIST: '/api/consultations',
+    DETAIL: (id) => `/api/consultations/${id}`,
+    UPDATE: (id) => `/api/consultations/${id}`,
+    DELETE: (id) => `/api/consultations/${id}`,
+  },
+  CLIENTS: {
+    LIST: '/api/clients',
+    CREATE: '/api/clients',
+    DETAIL: (id) => `/api/clients/${id}`,
+    UPDATE: (id) => `/api/clients/${id}`,
+    DELETE: (id) => `/api/clients/${id}`,
+    BY_STATUS: (status) => `/api/clients/status/${encodeURIComponent(status)}`,
+    STATUS_COUNT: '/api/clients/status/count',
+  },
 };

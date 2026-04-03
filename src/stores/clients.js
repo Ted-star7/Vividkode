@@ -1,94 +1,172 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import { clientsApi } from "@/services/api/modules/clients";
 
-const INITIAL_CLIENTS = [
-  {
-    id: 1,
-    name: "James Mwangi",
-    company: "Jsmart Solutions",
-    email: "jmwangi@jsmart.co.ke",
-    phone: "+254 712 456 789",
-    service: "Web Development",
-    status: "new",
-    notes:
-      "Wants complete redesign, about 20 pages including donation and volunteer sections",
-    value: 45000,
-    createdAt: "2024-04-12",
-  },
+function toArray(data) {
+  if (Array.isArray(data)) return data;
+  return [];
+}
 
-  {
-    id: 2,
-    name: "Grace Wanjiku",
-    company: "HopeBridge NGO",
-    email: "gwanjiku@hopebridge.org",
-    phone: "+254 722 389 114",
-    service: "Web Development",
-    status: "converted",
-    notes:
-      "Needs analytics dashboard for donor tracking and program impact reports",
-    value: 30000,
-    createdAt: "2024-03-15",
-  },
-  {
-    id: 3,
-    name: "David Otieno",
-    company: "Jsmart Solutions",
-    email: "dotieno@jsmart.co.ke",
-    phone: "+254 734 558 219",
-    service: "eBook Development",
-    status: "new",
-    notes:
-      "Needs design, formatting, and publishing support for a leadership and entrepreneurship eBook",
-    value: 85000, // KSh
-    currency: "KSh",
-    createdAt: "2024-05-02",
-  },
-  // { id: 3, name: 'Aisha Kamau', company: 'Youth Education NGO', email: 'aisha@ngo.org', phone: '+254 722 345 678', service: 'Web Development', status: 'contacted', notes: 'Non-profit, donor management portal', value: 2800, createdAt: '2024-04-10' },
-  // { id: 4, name: 'David Osei', company: 'Retail Group', email: 'david.osei@retail.com', phone: '+233 20 456 7890', service: 'Web Management', status: 'contacted', notes: 'WooCommerce migration, ~500 products', value: 7200, createdAt: '2024-04-09' },
-  // { id: 5, name: 'Priya Sharma', company: 'Fintech IN', email: 'p.sharma@fintech.in', phone: '+91 98765 43210', service: 'Web Development', status: 'new', notes: 'Lending platform MVP, 3 months timeline', value: 18000, createdAt: '2024-04-08' },
-  // { id: 6, name: 'James Omondi', company: 'Logistics KE', email: 'james@logistics.ke', phone: '+254 733 456 789', service: 'Data Solutions', status: 'converted', notes: 'Fleet management, 80 vehicles', value: 9500, createdAt: '2024-03-01' },
-  // { id: 7, name: 'Elena Vasquez', company: 'MedTech Solutions', email: 'elena@medtech.com', phone: '+34 612 345 678', service: 'Data Solutions', status: 'contacted', notes: 'Healthcare analytics platform', value: 22000, createdAt: '2024-02-20' },
-];
+function parseEstPrice(s) {
+  if (s == null || s === "") return 0;
+  const n = Number(String(s).replace(/[^0-9.-]/g, ""));
+  return Number.isNaN(n) ? 0 : n;
+}
+
+/** Map API row → UI shape used by ClientsView */
+function normalizeClient(c) {
+  const contact = (c?.contact ?? "").trim();
+  const isEmail = contact.includes("@");
+  return {
+    ...c,
+    id: c.id,
+    name: c.client || "",
+    company: "",
+    email: isEmail ? contact : "",
+    phone: isEmail ? "" : contact,
+    service: c.service || "",
+    status: (c.status || "new").toLowerCase(),
+    notes: c.notes || "",
+    value: parseEstPrice(c.estPrice),
+    estPrice: c.estPrice,
+  };
+}
+
+function toApiPayload(form) {
+  const contact =
+    (form.email && String(form.email).trim()) ||
+    (form.phone && String(form.phone).trim()) ||
+    "";
+  return {
+    id: form.id,
+    client: form.name,
+    service: form.service,
+    contact,
+    estPrice:
+      form.value != null && form.value !== ""
+        ? String(form.value)
+        : String(form.estPrice ?? ""),
+    status: form.status,
+    notes: form.notes || "",
+  };
+}
 
 export const useClientsStore = defineStore("clients", () => {
-  const clients = ref([...INITIAL_CLIENTS]);
+  const clients = ref([]);
+  const statusCounts = ref({
+    newCount: 0,
+    contactedCount: 0,
+    convertedCount: 0,
+  });
+  const loading = ref(false);
+  const error = ref("");
 
   const totalClients = computed(() => clients.value.length);
   const activeClients = computed(
-    () => clients.value.filter((c) => c.status === "converted").length,
+    () => statusCounts.value.convertedCount ?? clients.value.filter((c) => c.status === "converted").length,
   );
   const newLeads = computed(
-    () => clients.value.filter((c) => c.status === "new").length,
+    () => statusCounts.value.newCount ?? clients.value.filter((c) => c.status === "new").length,
   );
 
-  async function addClient(data) {
-    await new Promise((r) => setTimeout(r, 400));
-    clients.value.unshift({
-      ...data,
-      id: Date.now(),
-      createdAt: new Date().toISOString().split("T")[0],
-    });
+  async function fetchStatusCounts() {
+    try {
+      const res = await clientsApi.statusCount();
+      const data = res?.data ?? res;
+      if (data && typeof data === "object") {
+        statusCounts.value = {
+          newCount: data.newCount ?? 0,
+          contactedCount: data.contactedCount ?? 0,
+          convertedCount: data.convertedCount ?? 0,
+        };
+      }
+      return res;
+    } catch {
+      /* keep previous */
+    }
   }
 
-  async function updateClient(id, data) {
-    const idx = clients.value.findIndex((c) => c.id === id);
-    if (idx !== -1) clients.value[idx] = { ...clients.value[idx], ...data };
+  async function fetchClients() {
+    loading.value = true;
+    error.value = "";
+    try {
+      const res = await clientsApi.list();
+      const list = toArray(res?.data ?? res).map(normalizeClient);
+      clients.value = list;
+      await fetchStatusCounts();
+      return res;
+    } catch (e) {
+      error.value = e?.message || "Failed to load clients";
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function addClient(form) {
+    loading.value = true;
+    error.value = "";
+    try {
+      const payload = toApiPayload(form);
+      delete payload.id;
+      const res = await clientsApi.create(payload);
+      await fetchClients();
+      return res;
+    } catch (e) {
+      error.value = e?.message || "Failed to add client";
+      throw e;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function updateClient(id, form) {
+    loading.value = true;
+    error.value = "";
+    try {
+      const payload = toApiPayload({ ...form, id });
+      const res = await clientsApi.update(id, payload);
+      await fetchClients();
+      return res;
+    } catch (e) {
+      error.value = e?.message || "Failed to update client";
+      throw e;
+    } finally {
+      loading.value = false;
+    }
   }
 
   async function deleteClient(id) {
-    clients.value = clients.value.filter((c) => c.id !== id);
+    loading.value = true;
+    error.value = "";
+    try {
+      const res = await clientsApi.delete(id);
+      await fetchClients();
+      return res;
+    } catch (e) {
+      error.value = e?.message || "Failed to delete client";
+      throw e;
+    } finally {
+      loading.value = false;
+    }
   }
 
-  function updateStatus(id, status) {
-    const client = clients.value.find((c) => c.id === id);
-    if (client) client.status = status;
+  async function updateStatus(id, status) {
+    const client = clients.value.find((c) => String(c.id) === String(id));
+    if (!client) return;
+    return updateClient(id, { ...client, status });
   }
 
   return {
     clients,
+    statusCounts,
+    loading,
+    error,
     totalClients,
     activeClients,
     newLeads,
+    fetchClients,
+    fetchStatusCounts,
     addClient,
     updateClient,
     deleteClient,

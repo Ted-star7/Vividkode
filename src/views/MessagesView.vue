@@ -5,7 +5,7 @@
       <div>
         <h1 class="page-title">Messages</h1>
         <p class="text-sm text-gray-400 mt-0.5">
-          {{ messagesStore.totalMessages }} messages · <span class="text-gold-600 font-medium">{{ messagesStore.unreadCount }} unread</span>
+          {{ messagesStore.totalMessages }} consultations · <span class="text-gold-600 font-medium">{{ messagesStore.unreadCount }} unread</span>
         </p>
       </div>
       <div class="flex gap-2">
@@ -23,10 +23,11 @@
         <div class="p-3 border-b border-gray-100">
           <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
-            <input v-model="search" placeholder="Search messages..." class="input-field pl-9 py-2 text-sm" />
+            <input v-model="search" placeholder="Search consultations..." class="input-field pl-9 py-2 text-sm" />
           </div>
         </div>
-        <div class="divide-y divide-gray-50 overflow-y-auto max-h-[calc(100vh-280px)]">
+        <div v-if="messagesStore.loading" class="py-12 text-center text-gray-400 text-sm">Loading…</div>
+        <div v-else class="divide-y divide-gray-50 overflow-y-auto max-h-[calc(100vh-280px)]">
           <div v-for="msg in filteredMessages" :key="msg.id"
             @click="selectMessage(msg)"
             :class="['flex items-start gap-3 px-4 py-4 cursor-pointer transition-colors',
@@ -35,7 +36,7 @@
             ]">
             <div class="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
               :style="{ background: getAvatarColor(msg.name) }">
-              {{ msg.name.charAt(0) }}
+              {{ (msg.name || '?').charAt(0) }}
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between gap-1">
@@ -66,7 +67,7 @@
               <div class="flex items-start gap-4">
                 <div class="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold shrink-0"
                   :style="{ background: getAvatarColor(selectedMsg.name) }">
-                  {{ selectedMsg.name.charAt(0) }}
+                  {{ (selectedMsg.name || '?').charAt(0) }}
                 </div>
                 <div>
                   <h3 class="font-semibold text-navy-900">{{ selectedMsg.name }}</h3>
@@ -76,14 +77,15 @@
               </div>
               <div class="flex items-center gap-2">
                 <span :class="['badge text-[10px]', getStatusBadge(selectedMsg)]">{{ selectedMsg.status }}</span>
-                <button @click="messagesStore.deleteMessage(selectedMsg.id); selectedMsg = null" class="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors text-sm">🗑</button>
+                <button @click="removeSelected" class="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors text-sm">🗑</button>
               </div>
             </div>
 
-            <!-- Subject -->
+            <!-- Service / subject -->
             <div class="mb-4">
-              <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Subject</div>
+              <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Service</div>
               <h2 class="font-display text-lg font-semibold text-navy-900">{{ selectedMsg.subject }}</h2>
+              <p v-if="selectedMsg.companyName" class="text-xs text-gray-500 mt-1">{{ selectedMsg.companyName }}</p>
             </div>
 
             <!-- Message body -->
@@ -134,7 +136,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useMessagesStore } from '@/stores/messages'
 
 const messagesStore = useMessagesStore()
@@ -154,7 +156,12 @@ const filters = [
 
 const filteredMessages = computed(() => {
   return messagesStore.messages.filter(m => {
-    const matchSearch = !search.value || m.name.toLowerCase().includes(search.value.toLowerCase()) || m.subject.toLowerCase().includes(search.value.toLowerCase())
+    const q = search.value.toLowerCase()
+    const matchSearch = !search.value ||
+      (m.name && m.name.toLowerCase().includes(q)) ||
+      (m.subject && m.subject.toLowerCase().includes(q)) ||
+      (m.message && m.message.toLowerCase().includes(q)) ||
+      (m.email && m.email.toLowerCase().includes(q))
     const matchFilter = activeFilter.value === 'all' || m.status === activeFilter.value
     return matchSearch && matchFilter
   })
@@ -175,8 +182,19 @@ function getStatusBadge(msg) {
 
 const avatarColors = ['#102a43', '#c8861a', '#065f46', '#7c3aed', '#be185d', '#0369a1']
 function getAvatarColor(name) {
-  return avatarColors[name.charCodeAt(0) % avatarColors.length]
+  const c = (name && name.charCodeAt(0)) || 63
+  return avatarColors[c % avatarColors.length]
 }
+
+async function removeSelected() {
+  if (!selectedMsg.value) return
+  await messagesStore.deleteMessage(selectedMsg.value.id)
+  selectedMsg.value = null
+}
+
+onMounted(() => {
+  messagesStore.fetchConsultations().catch(() => {})
+})
 
 function openReply() { showReply.value = true }
 
