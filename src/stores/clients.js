@@ -53,19 +53,21 @@ function toApiPayload(form) {
 export const useClientsStore = defineStore("clients", () => {
   const clients = ref([]);
   const statusCounts = ref({
-    newCount: 0,
-    contactedCount: 0,
-    convertedCount: 0,
+    new: 0,
+    contacted: 0,
+    converted: 0,
   });
   const loading = ref(false);
   const error = ref("");
 
   const totalClients = computed(() => clients.value.length);
-  const activeClients = computed(
-    () => statusCounts.value.convertedCount ?? clients.value.filter((c) => c.status === "converted").length,
+  
+  const activeClients = computed(() => 
+    clients.value.filter((c) => c.status === "converted").length
   );
-  const newLeads = computed(
-    () => statusCounts.value.newCount ?? clients.value.filter((c) => c.status === "new").length,
+  
+  const newLeads = computed(() => 
+    clients.value.filter((c) => c.status === "new").length
   );
 
   async function fetchStatusCounts() {
@@ -74,13 +76,14 @@ export const useClientsStore = defineStore("clients", () => {
       const data = res?.data ?? res;
       if (data && typeof data === "object") {
         statusCounts.value = {
-          newCount: data.newCount ?? 0,
-          contactedCount: data.contactedCount ?? 0,
-          convertedCount: data.convertedCount ?? 0,
+          new: data.new ?? 0,
+          contacted: data.contacted ?? 0,
+          converted: data.converted ?? 0,
         };
       }
       return res;
-    } catch {
+    } catch (error) {
+      console.error("Failed to fetch status counts:", error);
     }
   }
 

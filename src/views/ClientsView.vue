@@ -22,7 +22,7 @@
       <div class="card p-4 flex items-center gap-3">
         <div class="w-10 h-10 bg-navy-50 rounded-xl flex items-center justify-center text-xl">📞</div>
         <div>
-          <div class="font-display text-2xl font-bold text-navy-900">{{ clientsStore.statusCounts.contactedCount }}</div>
+          <div class="font-display text-2xl font-bold text-navy-900">{{ clientsStore.statusCounts.contacted || 0 }}</div>
           <div class="text-xs text-gray-400">Contacted</div>
         </div>
       </div>
@@ -53,65 +53,67 @@
     <!-- Table -->
     <div v-if="clientsStore.loading" class="card p-12 text-center text-gray-400 text-sm">Loading clients…</div>
     <div v-else class="card overflow-hidden">
-      <table class="w-full">
-        <thead>
-          <tr>
-            <th class="table-header">Client</th>
-            <th class="table-header hidden md:table-cell">Service</th>
-            <th class="table-header hidden lg:table-cell">Contact</th>
-            <th class="table-header hidden lg:table-cell">Est. Value</th>
-            <th class="table-header">Status</th>
-            <th class="table-header">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="client in filteredClients" :key="client.id" class="table-row">
-            <td class="table-cell">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                  :style="{ background: getColor(client.name) }">
-                  {{ (client.name || '?').charAt(0) }}
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[800px]">
+          <thead>
+            <tr>
+              <th class="table-header">Client</th>
+              <th class="table-header hidden md:table-cell">Service</th>
+              <th class="table-header hidden lg:table-cell">Contact</th>
+              <th class="table-header hidden lg:table-cell">Est. Value</th>
+              <th class="table-header">Status</th>
+              <th class="table-header">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="client in filteredClients" :key="client.id" class="table-row">
+              <td class="table-cell">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    :style="{ background: getColor(client.name) }">
+                    {{ (client.name || '?').charAt(0) }}
+                  </div>
+                  <div>
+                    <div class="font-medium text-navy-800 text-sm">{{ client.name }}</div>
+                    <div class="text-xs text-gray-400">{{ client.company || '-' }}</div>
+                  </div>
                 </div>
-                <div>
-                  <div class="font-medium text-navy-800 text-sm">{{ client.name }}</div>
-                  <div class="text-xs text-gray-400">{{ client.company }}</div>
+              </td>
+              <td class="table-cell md:table-cell text-xs text-gray-600">{{ client.service || '-' }}</td>
+              <td class="hidden lg:table-cell">
+                <div class="text-xs text-gray-600">{{ client.email || '-' }}</div>
+                <div class="text-xs text-gray-400">{{ client.phone || '-' }}</div>
+              </td>
+              <td class="table-cell lg:table-cell">
+                <span class="font-mono text-sm font-semibold text-navy-800">{{
+                  client.estPrice != null && client.estPrice !== ''
+                    ? client.estPrice
+                    : client.value != null && client.value !== 0
+                      ? client.value.toLocaleString()
+                      : '—'
+                }}</span>
+              </td>
+              <td class="table-cell">
+                <select
+                  :value="client.status"
+                  @change="updateClientStatus(client, $event.target.value)"
+                  :class="['text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-navy-900/20', getStatusClass(client.status)]">
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="converted">Converted</option>
+                </select>
+              </td>
+              <td class="table-cell">
+                <div class="flex items-center gap-1">
+                  <button @click="openEdit(client)" class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-navy-700 transition-colors text-sm" title="Edit">✏️</button>
+                  <button @click="viewNotes(client)" class="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors text-sm" title="Notes">📋</button>
+                  <button @click="deleteTarget = client" class="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors text-sm" title="Delete">🗑</button>
                 </div>
-              </div>
-            </td>
-            <td class="table-cell md:table-cell text-xs text-gray-600">{{ client.service }}</td>
-            <td class="hidden lg:table-cell">
-              <div class="text-xs text-gray-600">{{ client.email }}</div>
-              <div class="text-xs text-gray-400">{{ client.phone }}</div>
-            </td>
-            <td class="table-cell lg:table-cell">
-              <span class="font-mono text-sm font-semibold text-navy-800">{{
-                client.estPrice != null && client.estPrice !== ''
-                  ? client.estPrice
-                  : client.value != null && client.value !== 0
-                    ? client.value.toLocaleString()
-                    : '—'
-              }}</span>
-            </td>
-            <td class="table-cell">
-              <select
-                :value="client.status"
-                @change="clientsStore.updateStatus(client.id, $event.target.value)"
-                :class="['text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-navy-900/20', getStatusClass(client.status)]">
-                <option value="new">New</option>
-                <option value="contacted">Contacted</option>
-                <option value="converted">Converted</option>
-              </select>
-            </td>
-            <td class="table-cell">
-              <div class="flex items-center gap-1">
-                <button @click="openEdit(client)" class="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-navy-700 transition-colors text-sm">✏️</button>
-                <button @click="viewNotes(client)" class="p-1.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors text-sm">📋</button>
-                <button @click="deleteTarget = client" class="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors text-sm">🗑</button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div v-if="filteredClients.length === 0" class="text-center py-12 text-gray-400">
         <div class="text-4xl mb-2">👥</div>
         <p>No clients found</p>
@@ -141,8 +143,9 @@
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="label">Email *</label>
-                  <input v-model="form.email" class="input-field" type="email" required />
+                  <label class="label">Email</label>
+                  <input v-model="form.email" class="input-field" type="email" />
+                  <p class="text-xs text-gray-400 mt-1">Either email or phone required</p>
                 </div>
                 <div>
                   <label class="label">Phone</label>
@@ -153,9 +156,9 @@
                 <div>
                   <label class="label">Service</label>
                   <select v-model="form.service" class="input-field">
-                    <option>Web Development</option>
-                    <option>Web Management</option>
-                    <option>Data Solutions</option>
+                    <option value="Web Development">Web Development</option>
+                    <option value="Web Management">Web Management</option>
+                    <option value="Data Solutions">Data Solutions</option>
                   </select>
                 </div>
                 <div>
@@ -168,8 +171,8 @@
                 </div>
               </div>
               <div>
-                <label class="label">Estimated Value ($)</label>
-                <input v-model.number="form.value" class="input-field" type="number" placeholder="0" />
+                <label class="label">Estimated Value</label>
+                <input v-model="form.estPrice" class="input-field" placeholder="e.g., 50,000" />
               </div>
               <div>
                 <label class="label">Notes</label>
@@ -196,7 +199,7 @@
               <button @click="notesClient = null" class="p-2 rounded-lg hover:bg-gray-100 transition-colors">✕</button>
             </div>
             <div class="bg-gray-50 rounded-xl p-4">
-              <p class="text-sm text-navy-700 leading-relaxed">{{ notesClient.notes || 'No notes yet.' }}</p>
+              <p class="text-sm text-navy-700 leading-relaxed whitespace-pre-wrap">{{ notesClient.notes || 'No notes yet.' }}</p>
             </div>
             <button @click="notesClient = null" class="btn-outline w-full mt-4">Close</button>
           </div>
@@ -235,7 +238,17 @@ const showModal = ref(false)
 const isEditing = ref(false)
 const deleteTarget = ref(null)
 const notesClient = ref(null)
-const form = reactive({ name: '', company: '', email: '', phone: '', service: 'Web Development', status: 'new', value: 0, notes: '' })
+
+const form = reactive({ 
+  name: '', 
+  company: '', 
+  email: '', 
+  phone: '', 
+  service: 'Web Development', 
+  status: 'new', 
+  estPrice: '', 
+  notes: '' 
+})
 
 const statusFilters = [
   { label: 'All', value: 'all' },
@@ -245,51 +258,215 @@ const statusFilters = [
 ]
 
 const filteredClients = computed(() => {
+  if (!clientsStore.clients) return []
   return clientsStore.clients.filter(c => {
-    const matchSearch = !search.value || c.name.toLowerCase().includes(search.value.toLowerCase()) || c.company?.toLowerCase().includes(search.value.toLowerCase())
+    const matchSearch = !search.value || 
+      c.name?.toLowerCase().includes(search.value.toLowerCase()) || 
+      c.company?.toLowerCase().includes(search.value.toLowerCase())
     const matchStatus = activeStatus.value === 'all' || c.status === activeStatus.value
     return matchSearch && matchStatus
   })
 })
 
 function getStatusClass(status) {
-  return { new: 'bg-gold-50 text-gold-700', contacted: 'bg-navy-50 text-navy-700', converted: 'bg-emerald-50 text-emerald-700' }[status] || 'bg-gray-100 text-gray-600'
+  const classes = { 
+    new: 'bg-gold-50 text-gold-700', 
+    contacted: 'bg-navy-50 text-navy-700', 
+    converted: 'bg-emerald-50 text-emerald-700' 
+  }
+  return classes[status] || 'bg-gray-100 text-gray-600'
 }
 
 const colors = ['#102a43', '#c8861a', '#065f46', '#7c3aed', '#be185d', '#0369a1', '#9a3412']
-function getColor(name) { return colors[name.charCodeAt(0) % colors.length] }
+function getColor(name) { 
+  if (!name) return colors[0]
+  return colors[name.charCodeAt(0) % colors.length] 
+}
 
 function openCreate() {
   isEditing.value = false
-  Object.assign(form, { name: '', company: '', email: '', phone: '', service: 'Web Development', status: 'new', value: 0, notes: '' })
+  Object.assign(form, { 
+    name: '', 
+    company: '', 
+    email: '', 
+    phone: '', 
+    service: 'Web Development', 
+    status: 'new', 
+    estPrice: '', 
+    notes: '' 
+  })
   showModal.value = true
 }
 
 function openEdit(client) {
   isEditing.value = true
-  Object.assign(form, { ...client })
+  Object.assign(form, { 
+    id: client.id,
+    name: client.name || '', 
+    company: client.company || '', 
+    email: client.email || '', 
+    phone: client.phone || '', 
+    service: client.service || 'Web Development', 
+    status: client.status || 'new', 
+    estPrice: client.estPrice || '', 
+    notes: client.notes || '' 
+  })
   showModal.value = true
 }
 
-function viewNotes(client) { notesClient.value = client }
+function viewNotes(client) { 
+  notesClient.value = client 
+}
 
 async function saveClient() {
-  if (isEditing.value) await clientsStore.updateClient(form.id, { ...form })
-  else await clientsStore.addClient({ ...form })
-  showModal.value = false
+  try {
+    // Validate that either email or phone is provided
+    if (!form.email && !form.phone) {
+      alert('Please provide either email or phone number')
+      return
+    }
+    
+    if (isEditing.value) {
+      await clientsStore.updateClient(form.id, { ...form })
+    } else {
+      await clientsStore.addClient({ ...form })
+    }
+    showModal.value = false
+  } catch (error) {
+    console.error('Failed to save client:', error)
+    alert('Failed to save client. Please try again.')
+  }
+}
+
+async function updateClientStatus(client, newStatus) {
+  try {
+    await clientsStore.updateStatus(client.id, newStatus)
+  } catch (error) {
+    console.error('Failed to update status:', error)
+    alert('Failed to update status. Please try again.')
+  }
 }
 
 async function doDelete() {
-  await clientsStore.deleteClient(deleteTarget.value.id)
-  deleteTarget.value = null
+  try {
+    await clientsStore.deleteClient(deleteTarget.value.id)
+    deleteTarget.value = null
+  } catch (error) {
+    console.error('Failed to delete client:', error)
+    alert('Failed to delete client. Please try again.')
+  }
 }
 
 onMounted(() => {
-  clientsStore.fetchClients().catch(() => {})
+  clientsStore.fetchClients().catch((error) => {
+    console.error('Failed to fetch clients:', error)
+  })
 })
 </script>
 
 <style scoped>
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0a1929;
+  font-family: 'Playfair Display', serif;
+}
+
+.btn-primary {
+  background-color: #c8861a;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #b07816;
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  border: 1px solid #e5e7eb;
+  background-color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-outline:hover {
+  background-color: #f9fafb;
+}
+
+.btn-danger {
+  background-color: #dc2626;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background-color: #b91c1c;
+}
+
+.card {
+  background-color: white;
+  border-radius: 1rem;
+  border: 1px solid #f3f4f6;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.input-field {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: #c8861a;
+  /* ring: 2px solid rgba(200, 134, 26, 0.2); */
+}
+
+.label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #4b5563;
+  margin-bottom: 0.25rem;
+}
+
+.table-header {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.table-cell {
+  padding: 1rem;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #f9fafb;
+}
+
+.table-row:hover {
+  background-color: #f9fafb;
+}
 </style>
