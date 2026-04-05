@@ -258,7 +258,7 @@ const userMenuOpen = ref(false);
 const notifOpen = ref(false);
 const isMobile = ref(false);
 
-// Watch for route changes to close mobile sidebar
+
 watch(
   () => route.path,
   () => {
@@ -319,7 +319,6 @@ function getUserInitials() {
 // Toggle sidebar with mobile awareness
 function toggleSidebar() {
   sidebarOpen.value = !sidebarOpen.value;
-  // On desktop, remember the state
   if (!isMobile.value) {
     localStorage.setItem("sidebarOpen", sidebarOpen.value);
   }
@@ -359,7 +358,6 @@ function checkMobile() {
       // Switching to mobile - close sidebar by default
       sidebarOpen.value = false;
     } else {
-      // Switching to desktop - restore saved state or default to open
       const savedState = localStorage.getItem("sidebarOpen");
       sidebarOpen.value = savedState !== null ? savedState === "true" : true;
     }
@@ -367,7 +365,6 @@ function checkMobile() {
 }
 
 onMounted(() => {
-  // Restore sidebar state from localStorage on desktop
   if (!isMobile.value) {
     const savedState = localStorage.getItem("sidebarOpen");
     if (savedState !== null) {

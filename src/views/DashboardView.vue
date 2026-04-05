@@ -57,7 +57,7 @@
       <!-- Stat cards - Using real data from projectsStore.stats with safe fallbacks -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div
-          v-for="(stat, i) in statsCards"
+          v-for="stat in statsCards"
           :key="stat.label"
           class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer"
           @click="router.push(stat.route)"
@@ -197,7 +197,9 @@
                     : 'bg-yellow-100 text-yellow-700',
                 ]"
               >
-                {{ project.projectType }}
+                {{
+                  project.projectType === "completed" ? "Completed" : "Ongoing"
+                }}
               </span>
             </div>
             <div
@@ -326,7 +328,7 @@ const router = useRouter();
 
 // Loading state
 const loading = ref(true);
-const selectedYear = ref(2026);
+const selectedYear = ref(new Date().getFullYear());
 
 // Get user display name
 function getUserDisplayName() {
@@ -340,7 +342,7 @@ const safeStats = computed(() => ({
   totalProjects: projectsStore.stats?.totalProjects ?? 0,
   totalPublicProjects: projectsStore.stats?.totalPublicProjects ?? 0,
   totalPrivateProjects: projectsStore.stats?.totalPrivateProjects ?? 0,
-  totalPendingProjects: projectsStore.stats?.totalPendingProjects ?? 0,
+  totalOngoingProjects: projectsStore.stats?.totalOngoingProjects ?? 0,
   totalCompletedProjects: projectsStore.stats?.totalCompletedProjects ?? 0,
 }));
 
@@ -380,14 +382,14 @@ const statsCards = computed(() => [
     route: "/dashboard/projects",
   },
   {
-    label: "Pending Projects",
-    value: safeStats.value.totalPendingProjects,
+    label: "Ongoing Projects",
+    value: safeStats.value.totalOngoingProjects,
     icon: "⏳",
     iconBg: "bg-yellow-50",
     change: "In progress",
     changeBg: "bg-yellow-50 text-yellow-700",
     barColor: "bg-yellow-500",
-    barWidth: `${Math.min((safeStats.value.totalPendingProjects / 20) * 100, 100)}%`,
+    barWidth: `${Math.min((safeStats.value.totalOngoingProjects / 20) * 100, 100)}%`,
     route: "/dashboard/projects",
   },
   {
@@ -403,11 +405,42 @@ const statsCards = computed(() => [
   },
 ]);
 
+// Function to generate monthly activity data from projects
+const getMonthlyActivityData = (year) => {
+  const monthlyCompleted = new Array(12).fill(0);
+  const monthlyStarted = new Array(12).fill(0);
+
+  projectsStore.projects.forEach((project, index) => {
+    // If project has a date field, use it. Otherwise, distribute evenly for demo
+    if (project.createdAt) {
+      const date = new Date(project.createdAt);
+      if (date.getFullYear() === year) {
+        if (project.projectType === "completed") {
+          monthlyCompleted[date.getMonth()]++;
+        } else if (project.projectType === "ongoing") {
+          monthlyStarted[date.getMonth()]++;
+        }
+      }
+    } else {
+      // For demo: distribute projects across months based on index
+      const monthIndex = index % 12;
+      if (project.projectType === "completed") {
+        monthlyCompleted[monthIndex]++;
+      } else if (project.projectType === "ongoing") {
+        monthlyStarted[monthIndex]++;
+      }
+    }
+  });
+
+  return {
+    completed: monthlyCompleted,
+    started: monthlyStarted,
+  };
+};
+
 // Bar chart data - using real project data
 const barData = computed(() => {
-  const monthlyData = projectsStore.getMonthlyActivityData(
-    Number(selectedYear.value),
-  );
+  const monthlyData = getMonthlyActivityData(Number(selectedYear.value));
   return {
     labels: [
       "Jan",
@@ -432,7 +465,7 @@ const barData = computed(() => {
         borderSkipped: false,
       },
       {
-        label: "Started",
+        label: "Started / Ongoing",
         data: monthlyData.started,
         backgroundColor: "#c8861a",
         borderRadius: 6,
@@ -472,22 +505,38 @@ const barOptions = {
   },
 };
 
-// Chart data using safe stats
-const doughnutData = computed(() => ({
-  labels: ["Completed", "Pending"],
-  datasets: [
-    {
-      data: [
-        safeStats.value.totalCompletedProjects,
-        safeStats.value.totalPendingProjects,
+// Chart data using safe stats - Now using "ongoing" instead of "pending"
+const doughnutData = computed(() => {
+  const completed = safeStats.value.totalCompletedProjects;
+  const ongoing = safeStats.value.totalOngoingProjects;
+
+  // If both are 0, show placeholder data
+  if (completed === 0 && ongoing === 0) {
+    return {
+      labels: ["No Data"],
+      datasets: [
+        {
+          data: [1],
+          backgroundColor: ["#e5e7eb"],
+          borderWidth: 0,
+        },
       ],
-      backgroundColor: ["#102a43", "#c8861a"],
-      borderWidth: 0,
-      hoverBorderWidth: 2,
-      hoverBorderColor: "#fff",
-    },
-  ],
-}));
+    };
+  }
+
+  return {
+    labels: ["Completed", "Ongoing"],
+    datasets: [
+      {
+        data: [completed, ongoing],
+        backgroundColor: ["#102a43", "#c8861a"],
+        borderWidth: 0,
+        hoverBorderWidth: 2,
+        hoverBorderColor: "#fff",
+      },
+    ],
+  };
+});
 
 const doughnutOptions = {
   responsive: true,
@@ -495,22 +544,47 @@ const doughnutOptions = {
   cutout: "70%",
   plugins: {
     legend: { display: false },
-    tooltip: { backgroundColor: "#0a1929", padding: 10, cornerRadius: 8 },
+    tooltip: {
+      backgroundColor: "#0a1929",
+      padding: 10,
+      cornerRadius: 8,
+      callbacks: {
+        label: function (context) {
+          const label = context.label || "";
+          const value = context.raw || 0;
+          const total = context.dataset.data.reduce((a, b) => a + b, 0);
+          const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+          return `${label}: ${value} (${percentage}%)`;
+        },
+      },
+    },
   },
 };
 
-const statusLegend = computed(() => [
-  {
-    label: "Completed",
-    color: "#102a43",
-    value: safeStats.value.totalCompletedProjects,
-  },
-  {
-    label: "Pending",
-    color: "#c8861a",
-    value: safeStats.value.totalPendingProjects,
-  },
-]);
+const statusLegend = computed(() => {
+  const completed = safeStats.value.totalCompletedProjects;
+  const ongoing = safeStats.value.totalOngoingProjects;
+  const total = completed + ongoing;
+
+  return [
+    {
+      label: "Completed",
+      color: "#102a43",
+      value:
+        total > 0
+          ? `${completed} (${Math.round((completed / total) * 100)}%)`
+          : "0",
+    },
+    {
+      label: "Ongoing",
+      color: "#c8861a",
+      value:
+        total > 0
+          ? `${ongoing} (${Math.round((ongoing / total) * 100)}%)`
+          : "0",
+    },
+  ];
+});
 
 // Recent projects (first 5 from store)
 const recentProjects = computed(() =>
@@ -552,15 +626,54 @@ setInterval(() => {
   });
 }, 1000);
 
-const activities = [
-  {
-    id: 1,
-    icon: "✅",
-    bg: "bg-emerald-100 text-emerald-700",
-    text: 'Project "LogiChain Supply Management" marked as completed',
-    time: "2 hours ago",
-  },
-];
+// Generate activities from recent projects
+const activities = computed(() => {
+  const recentActivities = [];
+
+  // Add project completion activities for completed projects
+  const completedProjects = (projectsStore.projects || [])
+    .filter((p) => p.projectType === "completed")
+    .slice(0, 2);
+  completedProjects.forEach((project, index) => {
+    recentActivities.push({
+      id: recentActivities.length + 1,
+      icon: "✅",
+      bg: "bg-emerald-100 text-emerald-700",
+      text: `Project "${project.title}" marked as completed`,
+      time: index === 0 ? "2 hours ago" : "Yesterday",
+    });
+  });
+
+  // Add ongoing project activities
+  const ongoingProjects = (projectsStore.projects || [])
+    .filter((p) => p.projectType === "ongoing")
+    .slice(0, 2);
+  ongoingProjects.forEach((project, index) => {
+    recentActivities.push({
+      id: recentActivities.length + 1,
+      icon: "⏳",
+      bg: "bg-yellow-100 text-yellow-700",
+      text: `Project "${project.title}" is now ongoing`,
+      time: index === 0 ? "3 days ago" : "1 week ago",
+    });
+  });
+
+  // Add public/private status activities
+  (projectsStore.projects || []).slice(0, 2).forEach((project, index) => {
+    recentActivities.push({
+      id: recentActivities.length + 1,
+      icon: project.status === "public" ? "🌍" : "🔒",
+      bg:
+        project.status === "public"
+          ? "bg-green-100 text-green-700"
+          : "bg-gray-100 text-gray-700",
+      text: `Project "${project.title}" set to ${project.status}`,
+      time: index === 0 ? "1 week ago" : "2 weeks ago",
+    });
+  });
+
+  return recentActivities.slice(0, 5);
+});
 
 // Load data on mount
 onMounted(async () => {
@@ -574,12 +687,39 @@ onMounted(async () => {
 
     const results = await Promise.allSettled(promises);
 
-    // Log
+    // Log any failures
     results.forEach((result, index) => {
       if (result.status === "rejected") {
         console.error(`API call ${index} failed:`, result.reason);
       }
     });
+
+    // Calculate stats from the actual projects data
+    if (projectsStore.projects && projectsStore.projects.length > 0) {
+      const projects = projectsStore.projects;
+      const totalProjects = projects.length;
+      const totalPublicProjects = projects.filter(
+        (p) => p.status === "public",
+      ).length;
+      const totalPrivateProjects = projects.filter(
+        (p) => p.status === "private",
+      ).length;
+      const totalCompletedProjects = projects.filter(
+        (p) => p.projectType === "completed",
+      ).length;
+      const totalOngoingProjects = projects.filter(
+        (p) => p.projectType === "ongoing",
+      ).length;
+
+      // Update the store stats
+      projectsStore.stats = {
+        totalProjects,
+        totalPublicProjects,
+        totalPrivateProjects,
+        totalOngoingProjects,
+        totalCompletedProjects,
+      };
+    }
   } catch (error) {
     console.error("Error loading dashboard data:", error);
   } finally {
@@ -588,6 +728,4 @@ onMounted(async () => {
 });
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

@@ -13,7 +13,6 @@ function parseEstPrice(s) {
   return Number.isNaN(n) ? 0 : n;
 }
 
-/** Map API row → UI shape used by ClientsView */
 function normalizeClient(c) {
   const contact = (c?.contact ?? "").trim();
   const isEmail = contact.includes("@");
@@ -82,7 +81,6 @@ export const useClientsStore = defineStore("clients", () => {
       }
       return res;
     } catch {
-      /* keep previous */
     }
   }
 
