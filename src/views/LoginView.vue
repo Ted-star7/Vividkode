@@ -210,7 +210,7 @@
             </svg>
           </button>
         </form>
-        ----------Forgot password link (optional) ----------
+
         <div class="flex items-center justify-between mt-4">
           <label class="flex items-center gap-2 text-sm text-navy-300">
             <input
